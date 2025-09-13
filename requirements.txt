@@ -1,0 +1,13 @@
+pdfplumber==0.10.3
+nltk==3.8.1
+sentence-transformers==2.2.2
+PyPDF2==3.0.1
+regex==2023.12.25
+streamlit==1.32.2
+pymongo
+sentence-transformers 
+pdfplumber 
+pymupdf 
+pillow 
+pytesseract
+

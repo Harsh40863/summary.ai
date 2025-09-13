@@ -1,0 +1,204 @@
+# db_ingest.py
+import pdfplumber
+import fitz  # PyMuPDF
+from pymongo import MongoClient
+from docx import Document as DocxDocument
+from pymongo.errors import DuplicateKeyError
+from pptx import Presentation
+from hashlib import md5
+from pymongo import ASCENDING
+
+# your embedding function
+from embedding.embedder import get_embeddings
+
+# --- MongoDB connection ---
+uri = "mongodb+srv://harshvaishnav0314:Harsh40863@cluster0.aqqqpes.mongodb.net/"
+client = MongoClient(uri)
+db = client["hackindia_documents"]
+pdf_collection = db["pdf_documents"]
+image_collection = db["images"]
+
+
+# Create unique indexes (safe to call repeatedly)
+# at the top of your module, after connecting to the collection:
+
+
+# drop old indexes once (only if you want to reset):
+# pdf_collection.drop_index("text_hash_1")
+# image_collection.drop_index("image_hash_1")
+
+pdf_collection.create_index([("text_hash", ASCENDING)], unique=True,name="text_hash_idx")
+image_collection.create_index([("image_hash", ASCENDING)], unique=True,name="image_hash_idx")
+
+
+
+def upload_file_to_db(file_obj):
+    """
+    Accepts an uploaded file (Streamlit UploadedFile),
+    extracts text & images in-memory, and saves them to MongoDB.
+    Handles PDF, DOCX, PPTX, TXT, JPG, PNG.
+    Returns dict with status and message.
+    """
+    ext = file_obj.name.lower().split('.')[-1]
+    result = {"text_inserted": False, "images_inserted": 0, "message": ""}
+
+    # ---------- PDFs ----------
+    if ext == "pdf":
+        # extract text
+        text = ""
+        with pdfplumber.open(file_obj) as pdf:
+            for page in pdf.pages:
+                page_text = page.extract_text()
+                if page_text:
+                    text += page_text + "\n"
+
+        if text.strip():
+            text_hash = md5(text.encode("utf-8")).hexdigest()
+            embedding = get_embeddings([text])[0].tolist()
+            try:
+                pdf_collection.insert_one({
+                    "filename": file_obj.name,
+                    "text": text,
+                    "text_hash": text_hash,
+                    "embedding": embedding
+                })
+                result["text_inserted"] = True
+                result["message"] += "Text saved. "
+            except DuplicateKeyError:
+                result["message"] += "Duplicate text skipped. "
+
+        # extract images
+        doc = fitz.open(stream=file_obj.getvalue(), filetype="pdf")
+        inserted_images = 0
+        for page_index in range(len(doc)):
+            page = doc[page_index]
+            for img_index, img in enumerate(page.get_images(full=True)):
+                xref = img[0]
+                base_image = doc.extract_image(xref)
+                image_bytes = base_image["image"]
+                image_hash = md5(image_bytes).hexdigest()
+                try:
+                    image_collection.insert_one({
+                        "filename": file_obj.name,
+                        "page": page_index + 1,
+                        "image_index": img_index,
+                        "image_bytes": image_bytes,
+                        "image_hash": image_hash
+                    })
+                    inserted_images += 1
+                except DuplicateKeyError:
+                    pass
+        result["images_inserted"] = inserted_images
+        if inserted_images:
+            result["message"] += f"{inserted_images} new image(s) saved."
+
+        return result
+
+    # ---------- DOCX ----------
+    elif ext == "docx":
+        doc = DocxDocument(file_obj)
+        text = "\n".join([para.text for para in doc.paragraphs if para.text.strip()])
+        if text.strip():
+            text_hash = md5(text.encode("utf-8")).hexdigest()
+            embedding = get_embeddings([text])[0].tolist()
+            try:
+                pdf_collection.insert_one({
+                    "filename": file_obj.name,
+                    "text": text,
+                    "text_hash": text_hash,
+                    "embedding": embedding
+                })
+                result["text_inserted"] = True
+                result["message"] = "Document saved."
+            except DuplicateKeyError:
+                result["message"] = "Duplicate document skipped."
+        return result
+
+    # ---------- PPTX ----------
+    elif ext == "pptx":
+        prs = Presentation(file_obj)
+        text_runs = []
+        for slide in prs.slides:
+            for shape in slide.shapes:
+                if hasattr(shape, "text") and shape.text.strip():
+                    text_runs.append(shape.text)
+        text = "\n".join(text_runs)
+        if text.strip():
+            text_hash = md5(text.encode("utf-8")).hexdigest()
+            embedding = get_embeddings([text])[0].tolist()
+            try:
+                pdf_collection.insert_one({
+                    "filename": file_obj.name,
+                    "text": text,
+                    "text_hash": text_hash,
+                    "embedding": embedding
+                })
+                result["text_inserted"] = True
+                result["message"] = "Presentation saved."
+            except DuplicateKeyError:
+                result["message"] = "Duplicate presentation skipped."
+        return result
+
+    # ---------- TXT ----------
+    elif ext == "txt":
+        text = file_obj.getvalue().decode("utf-8", errors="ignore")
+        if text.strip():
+            text_hash = md5(text.encode("utf-8")).hexdigest()
+            embedding = get_embeddings([text])[0].tolist()
+            try:
+                pdf_collection.insert_one({
+                    "filename": file_obj.name,
+                    "text": text,
+                    "text_hash": text_hash,
+                    "embedding": embedding
+                })
+                result["text_inserted"] = True
+                result["message"] = "Text file saved."
+            except DuplicateKeyError:
+                result["message"] = "Duplicate text file skipped."
+        return result
+
+    # ---------- Images (jpg/png/jpeg) ----------
+    elif ext in ["jpg", "jpeg", "png"]:
+        image_bytes = file_obj.getvalue()
+        image_hash = md5(image_bytes).hexdigest()
+        try:
+            image_collection.insert_one({
+                "filename": file_obj.name,
+                "page": None,
+                "image_index": None,
+                "image_bytes": image_bytes,
+                "image_hash": image_hash
+            })
+            result["images_inserted"] = 1
+            result["message"] = "Image saved."
+        except DuplicateKeyError:
+            result["message"] = "Duplicate image skipped."
+        return result
+
+    else:
+        result["message"] = "Unsupported file type."
+        return result
+
+# db_ingest.py (add below upload_file_to_db)
+
+def fetch_documents_from_db():
+    """
+    Fetches all text-based documents from MongoDB and returns them
+    in the same structure used by get_documents_from_folder().
+    """
+    docs = []
+    for i, doc in enumerate(pdf_collection.find()):
+        # fallback metadata if not present
+        metadata = {
+            "author": doc.get("author", "Unknown"),
+            "date": doc.get("date", "")  # you can set date at upload time if needed
+        }
+        docs.append({
+            "doc_id": doc.get("doc_id", f"doc_{i:03}"),
+            "name": doc.get("filename", f"doc_{i:03}"),
+            "content": doc.get("text", ""),
+            "metadata": metadata
+        })
+    return docs
+
