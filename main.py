@@ -60,67 +60,6 @@ try:
     nltk.data.find("tokenizers/punkt")
 except LookupError:
     nltk.download("punkt")
-
-# ---------------------------
-# Document Handling
-# ---------------------------
-pdf_folder_path = r"C:\Users\Asus\OneDrive\Desktop\hackindia\pdf_files"
-os.makedirs(pdf_folder_path, exist_ok=True)
-
-def extract_text_from_file(file_path):
-    ext = file_path.lower().split('.')[-1]
-    if ext == 'pdf':
-        reader = PdfReader(file_path)
-        text = ""
-        for page in reader.pages:
-            page_text = page.extract_text()
-            if page_text and page_text.strip():
-                text += page_text + "\n"
-        return text.strip()
-
-    elif ext == 'docx':
-        doc = DocxDocument(file_path)
-        return "\n".join([para.text for para in doc.paragraphs if para.text.strip()])
-
-    elif ext == 'pptx':
-        prs = Presentation(file_path)
-        text_runs = []
-        for slide in prs.slides:
-            for shape in slide.shapes:
-                if hasattr(shape, "text"):
-                    text_runs.append(shape.text)
-        return "\n".join(text_runs)
-
-    elif ext == 'txt':
-        with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-            return f.read()
-
-    else:
-        return ""
-
-def get_documents_from_folder(folder_path):
-    supported_exts = [".pdf", ".docx", ".pptx", ".txt"]
-    documents = []
-    for i, filename in enumerate(os.listdir(folder_path)):
-        if not any(filename.lower().endswith(ext) for ext in supported_exts):
-            continue
-        path = os.path.join(folder_path, filename)
-        text = extract_text_from_file(path)
-        if len(text) < 100:
-            continue
-        doc_id = f"doc_{i:03}"
-        metadata = {
-            "author": "Unknown",
-            "date": datetime.fromtimestamp(os.path.getmtime(path)).strftime('%Y-%m-%d')
-        }
-        documents.append({
-            "doc_id": doc_id,
-            "name": filename,
-            "content": text,
-            "metadata": metadata
-        })
-    return documents
-
 # ---------------------------
 # Upload Interface
 # ---------------------------
