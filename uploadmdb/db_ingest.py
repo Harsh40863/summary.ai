@@ -7,6 +7,7 @@ from pymongo.errors import DuplicateKeyError
 from pptx import Presentation
 from hashlib import md5
 from pymongo import ASCENDING
+import io
 
 # your embedding function
 from embedding.embedder import get_embeddings
@@ -18,35 +19,35 @@ db = client["hackindia_documents"]
 pdf_collection = db["pdf_documents"]
 image_collection = db["images"]
 
-
 # Create unique indexes (safe to call repeatedly)
-# at the top of your module, after connecting to the collection:
-
-
-# drop old indexes once (only if you want to reset):
-# pdf_collection.drop_index("text_hash_1")
-# image_collection.drop_index("image_hash_1")
-
-pdf_collection.create_index([("text_hash", ASCENDING)], unique=True,name="text_hash_idx")
-image_collection.create_index([("image_hash", ASCENDING)], unique=True,name="image_hash_idx")
-
+pdf_collection.create_index([("text_hash", ASCENDING)], unique=True, name="text_hash_idx")
+image_collection.create_index([("image_hash", ASCENDING)], unique=True, name="image_hash_idx")
 
 
 def upload_file_to_db(file_obj):
     """
-    Accepts an uploaded file (Streamlit UploadedFile),
+    Accepts an uploaded file (FastAPI UploadFile),
     extracts text & images in-memory, and saves them to MongoDB.
     Handles PDF, DOCX, PPTX, TXT, JPG, PNG.
     Returns dict with status and message.
     """
-    ext = file_obj.name.lower().split('.')[-1]
+    # FIXED: Use .filename instead of .name for FastAPI UploadFile
+    filename = file_obj.filename
+    if not filename:
+        return {"text_inserted": False, "images_inserted": 0, "message": "No filename provided"}
+    
+    ext = filename.lower().split('.')[-1]
     result = {"text_inserted": False, "images_inserted": 0, "message": ""}
+
+    # Read file content into memory
+    file_content = file_obj.file.read()
+    file_obj.file.seek(0)  # Reset file pointer for potential reuse
 
     # ---------- PDFs ----------
     if ext == "pdf":
         # extract text
         text = ""
-        with pdfplumber.open(file_obj) as pdf:
+        with pdfplumber.open(io.BytesIO(file_content)) as pdf:
             for page in pdf.pages:
                 page_text = page.extract_text()
                 if page_text:
@@ -57,7 +58,7 @@ def upload_file_to_db(file_obj):
             embedding = get_embeddings([text])[0].tolist()
             try:
                 pdf_collection.insert_one({
-                    "filename": file_obj.name,
+                    "filename": filename,
                     "text": text,
                     "text_hash": text_hash,
                     "embedding": embedding
@@ -68,7 +69,7 @@ def upload_file_to_db(file_obj):
                 result["message"] += "Duplicate text skipped. "
 
         # extract images
-        doc = fitz.open(stream=file_obj.getvalue(), filetype="pdf")
+        doc = fitz.open(stream=file_content, filetype="pdf")
         inserted_images = 0
         for page_index in range(len(doc)):
             page = doc[page_index]
@@ -79,7 +80,7 @@ def upload_file_to_db(file_obj):
                 image_hash = md5(image_bytes).hexdigest()
                 try:
                     image_collection.insert_one({
-                        "filename": file_obj.name,
+                        "filename": filename,
                         "page": page_index + 1,
                         "image_index": img_index,
                         "image_bytes": image_bytes,
@@ -96,14 +97,14 @@ def upload_file_to_db(file_obj):
 
     # ---------- DOCX ----------
     elif ext == "docx":
-        doc = DocxDocument(file_obj)
+        doc = DocxDocument(io.BytesIO(file_content))
         text = "\n".join([para.text for para in doc.paragraphs if para.text.strip()])
         if text.strip():
             text_hash = md5(text.encode("utf-8")).hexdigest()
             embedding = get_embeddings([text])[0].tolist()
             try:
                 pdf_collection.insert_one({
-                    "filename": file_obj.name,
+                    "filename": filename,
                     "text": text,
                     "text_hash": text_hash,
                     "embedding": embedding
@@ -116,7 +117,7 @@ def upload_file_to_db(file_obj):
 
     # ---------- PPTX ----------
     elif ext == "pptx":
-        prs = Presentation(file_obj)
+        prs = Presentation(io.BytesIO(file_content))
         text_runs = []
         for slide in prs.slides:
             for shape in slide.shapes:
@@ -128,7 +129,7 @@ def upload_file_to_db(file_obj):
             embedding = get_embeddings([text])[0].tolist()
             try:
                 pdf_collection.insert_one({
-                    "filename": file_obj.name,
+                    "filename": filename,
                     "text": text,
                     "text_hash": text_hash,
                     "embedding": embedding
@@ -141,13 +142,13 @@ def upload_file_to_db(file_obj):
 
     # ---------- TXT ----------
     elif ext == "txt":
-        text = file_obj.getvalue().decode("utf-8", errors="ignore")
+        text = file_content.decode("utf-8", errors="ignore")
         if text.strip():
             text_hash = md5(text.encode("utf-8")).hexdigest()
             embedding = get_embeddings([text])[0].tolist()
             try:
                 pdf_collection.insert_one({
-                    "filename": file_obj.name,
+                    "filename": filename,
                     "text": text,
                     "text_hash": text_hash,
                     "embedding": embedding
@@ -160,11 +161,11 @@ def upload_file_to_db(file_obj):
 
     # ---------- Images (jpg/png/jpeg) ----------
     elif ext in ["jpg", "jpeg", "png"]:
-        image_bytes = file_obj.getvalue()
+        image_bytes = file_content
         image_hash = md5(image_bytes).hexdigest()
         try:
             image_collection.insert_one({
-                "filename": file_obj.name,
+                "filename": filename,
                 "page": None,
                 "image_index": None,
                 "image_bytes": image_bytes,
@@ -180,7 +181,6 @@ def upload_file_to_db(file_obj):
         result["message"] = "Unsupported file type."
         return result
 
-# db_ingest.py (add below upload_file_to_db)
 
 def fetch_documents_from_db():
     """
@@ -201,4 +201,3 @@ def fetch_documents_from_db():
             "metadata": metadata
         })
     return docs
-

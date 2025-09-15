@@ -94,13 +94,13 @@ class DocumentSearchEngine:
             try:
                 result = upload_file_to_db(uploaded_file)
                 results.append({
-                    "filename": uploaded_file.name if hasattr(uploaded_file, 'name') else str(uploaded_file),
+                    "filename": uploaded_file.filename if hasattr(uploaded_file, 'filename') else str(uploaded_file),
                     "status": "success",
                     "message": result
                 })
             except Exception as e:
                 results.append({
-                    "filename": uploaded_file.name if hasattr(uploaded_file, 'name') else str(uploaded_file),
+                    "filename": uploaded_file.filename if hasattr(uploaded_file, 'filename') else str(uploaded_file),
                     "status": "error",
                     "message": str(e)
                 })

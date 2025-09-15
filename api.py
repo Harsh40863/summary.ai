@@ -58,10 +58,11 @@ class QueryResponse(BaseModel):
     timestamp: str
     query: str
 
+# FIXED: Changed from Dict[str, str] to Dict[str, Any] to handle non-string values
 class UploadResponse(BaseModel):
     success: bool
     message: str
-    uploaded_files: List[Dict[str, str]]
+    uploaded_files: List[Dict[str, Any]]  # This was the issue - changed from str to Any
     timestamp: str
 
 class DocumentInfo(BaseModel):
@@ -135,7 +136,14 @@ async def upload_files(
         allowed_extensions = {'.pdf', '.docx', '.pptx', '.txt', '.jpg', '.jpeg', '.png'}
         
         for file in files:
-            file_ext = os.path.splitext(file.filename.lower())[1] if file.filename else ""
+            # Fix: Use filename instead of name, and add proper null checking
+            if not file.filename:
+                raise HTTPException(
+                    status_code=400, 
+                    detail="File must have a filename"
+                )
+            
+            file_ext = os.path.splitext(file.filename.lower())[1]
             if file_ext not in allowed_extensions:
                 raise HTTPException(
                     status_code=400, 
@@ -145,7 +153,10 @@ async def upload_files(
         # Upload files
         upload_results = engine.upload_files(files)
         
-        success_count = sum(1 for result in upload_results if result['status'] == 'success')
+        # Debug: Log the upload results to see what's being returned
+        logger.info(f"Upload results: {upload_results}")
+        
+        success_count = sum(1 for result in upload_results if result.get('status') == 'success')
         
         return UploadResponse(
             success=success_count > 0,
@@ -408,9 +419,9 @@ if __name__ == "__main__":
     import uvicorn
     
     # Configuration
-    HOST = os.getenv("HOST", "0.0.0.0")
-    PORT = int(os.getenv("PORT", 8000))
-    DEBUG = os.getenv("DEBUG", "false").lower() == "true"
+    HOST = os.getenv("HOST", "127.0.0.1")  # Change default if needed
+    PORT = int(os.getenv("PORT", 8080))     # Change default if needed
+    DEBUG = os.getenv("DEBUG", "true").lower() == "true"  # Enable debug by default
     
     logger.info(f"Starting server on {HOST}:{PORT}")
     uvicorn.run(
