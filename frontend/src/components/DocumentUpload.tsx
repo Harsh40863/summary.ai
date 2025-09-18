@@ -5,10 +5,18 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { toast } from '@/hooks/use-toast';
 
-interface UploadedFile {
-  name: string;
-  status: 'success' | 'error';
+// Interface to match the nested message object from the API
+interface UploadMessage {
+  text_inserted?: boolean;
+  images_inserted?: number;
   message: string;
+}
+
+// Updated interface to match the API response structure
+interface UploadedFile {
+  filename: string; // FIX: Changed from 'name' to 'filename'
+  status: 'success' | 'error';
+  message: string | UploadMessage; // FIX: Can be a string or the object type
 }
 
 interface DocumentUploadProps {
@@ -37,7 +45,8 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ onUploadComplete }) => 
       });
 
       if (!response.ok) {
-        throw new Error(`Upload failed: ${response.statusText}`);
+        const errorData = await response.json().catch(() => ({ detail: response.statusText }));
+        throw new Error(`Upload failed: ${errorData.detail || response.statusText}`);
       }
 
       const result = await response.json();
@@ -54,7 +63,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ onUploadComplete }) => 
       } else {
         toast({
           title: "Upload Failed",
-          description: "No files were uploaded successfully",
+          description: result.message || "No files were uploaded successfully",
           variant: "destructive",
         });
       }
@@ -62,7 +71,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ onUploadComplete }) => 
       console.error('Upload error:', error);
       toast({
         title: "Upload Error",
-        description: error instanceof Error ? error.message : "Upload failed",
+        description: error instanceof Error ? error.message : "Upload failed due to a network or server error.",
         variant: "destructive",
       });
     } finally {
@@ -84,6 +93,9 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ onUploadComplete }) => 
   });
 
   const getFileIcon = (fileName: string) => {
+    // FIX: Add a check to prevent errors if fileName is somehow still undefined
+    if (!fileName) return <FileText className="w-4 h-4" />;
+    
     const ext = fileName.toLowerCase().split('.').pop();
     if (ext === 'pdf' || ext === 'docx' || ext === 'pptx' || ext === 'txt') {
       return <FileText className="w-4 h-4" />;
@@ -92,6 +104,14 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ onUploadComplete }) => 
       return <Image className="w-4 h-4" />;
     }
     return <FileText className="w-4 h-4" />;
+  };
+  
+  // Helper to render the message correctly
+  const renderUploadMessage = (message: string | UploadMessage) => {
+    if (typeof message === 'string') {
+      return message;
+    }
+    return message.message || 'Processing complete.';
   };
 
   return (
@@ -123,7 +143,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ onUploadComplete }) => 
                   Drag & drop your documents here, or click to browse. 
                   Supports PDF, DOCX, PPTX, TXT, JPG, PNG files.
                 </p>
-                <Button variant="hero" size="lg" className="mt-4">
+                <Button variant="outline" size="lg" className="mt-4">
                   Browse Files
                 </Button>
               </>
@@ -142,8 +162,9 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ onUploadComplete }) => 
                   key={index}
                   className="flex items-center space-x-3 p-3 rounded-lg bg-muted/30"
                 >
-                  {getFileIcon(file.name)}
-                  <span className="flex-1 font-medium">{file.name}</span>
+                  {/* FIX: Use file.filename */}
+                  {getFileIcon(file.filename)}
+                  <span className="flex-1 font-medium truncate">{file.filename}</span>
                   {file.status === 'success' ? (
                     <CheckCircle className="w-5 h-5 text-success" />
                   ) : (
@@ -154,7 +175,8 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ onUploadComplete }) => 
                       file.status === 'success' ? 'text-success' : 'text-destructive'
                     }`}
                   >
-                    {file.message}
+                    {/* FIX: Use helper function to render message */}
+                    {renderUploadMessage(file.message)}
                   </span>
                 </div>
               ))}
