@@ -25,7 +25,7 @@ def generate_answer_with_rag(query, summary, doc_name):
 
     outputs = model.generate(
         **inputs,
-        max_length=300,
+        max_length=1000,
         min_length=80,
         num_beams=5,
         temperature=0.7,

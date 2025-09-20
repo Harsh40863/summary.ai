@@ -1,5 +1,5 @@
 # ---------------------------
-# FastAPI Application for Document Search
+# FastAPI Application with Translation for Search and Think Only
 # ---------------------------
 from fastapi import FastAPI, File, UploadFile, HTTPException, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,6 +14,9 @@ import os
 # Import the logic module
 from backend.logic import get_search_engine, reset_search_engine, DocumentSearchEngine
 
+# Import translation functions
+from translation.redis_translator import translate_response, get_supported_languages, is_supported_language
+
 # ---------------------------
 # Configure Logging
 # ---------------------------
@@ -24,8 +27,8 @@ logger = logging.getLogger(__name__)
 # FastAPI App Configuration
 # ---------------------------
 app = FastAPI(
-    title="Smart AI-Powered Document Search API",
-    description="API for intelligent document search, exploration, and analysis",
+    title="Smart AI-Powered Document Search API with Translation",
+    description="API for intelligent document search, exploration, and analysis with translation support",
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc"
@@ -43,12 +46,19 @@ app.add_middleware(
 )
 
 # ---------------------------
-# Pydantic Models
+# Updated Pydantic Models
 # ---------------------------
 class QueryRequest(BaseModel):
     query: str = Field(..., min_length=1, description="Search query string")
     action: str = Field(..., description="Action type: search, explore, or think")
     threshold: Optional[float] = Field(0.35, description="Similarity threshold for relevance")
+    translate_to: Optional[str] = Field('en', description="Target language (en, hi, fr, es, de, ja, ko, zh) - Only for search and think actions")
+
+class TranslationInfo(BaseModel):
+    target_language: str
+    target_language_name: str
+    source_language: str
+    translated: bool
 
 class QueryResponse(BaseModel):
     success: bool
@@ -57,12 +67,12 @@ class QueryResponse(BaseModel):
     action: str
     timestamp: str
     query: str
+    translation: Optional[TranslationInfo] = None
 
-# FIXED: Changed from Dict[str, str] to Dict[str, Any] to handle non-string values
 class UploadResponse(BaseModel):
     success: bool
     message: str
-    uploaded_files: List[Dict[str, Any]]  # This was the issue - changed from str to Any
+    uploaded_files: List[Dict[str, Any]]
     timestamp: str
 
 class DocumentInfo(BaseModel):
@@ -90,6 +100,11 @@ class ErrorResponse(BaseModel):
     details: Optional[str] = None
     timestamp: str
 
+class SupportedLanguagesResponse(BaseModel):
+    languages: Dict[str, str]
+    default: str
+    note: str
+
 # ---------------------------
 # Dependency Functions
 # ---------------------------
@@ -109,10 +124,11 @@ def get_engine() -> DocumentSearchEngine:
 async def root():
     """Root endpoint with API information"""
     return {
-        "message": "Smart AI-Powered Document Search API",
+        "message": "Smart AI-Powered Document Search API with Translation",
         "version": "1.0.0",
         "docs": "/docs",
-        "health": "/health"
+        "health": "/health",
+        "languages": "/languages"
     }
 
 @app.get("/health", response_model=HealthResponse)
@@ -125,6 +141,19 @@ async def health_check(engine: DocumentSearchEngine = Depends(get_engine)):
         logger.error(f"Health check failed: {e}")
         raise HTTPException(status_code=500, detail="Health check failed")
 
+@app.get("/languages", response_model=SupportedLanguagesResponse)
+async def get_languages():
+    """Get supported translation languages"""
+    try:
+        return SupportedLanguagesResponse(
+            languages=get_supported_languages(),
+            default="en",
+            note="Translation available for 'search' and 'think' actions only. 'explore' action remains in original language."
+        )
+    except Exception as e:
+        logger.error(f"Failed to get languages: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get supported languages")
+
 @app.post("/upload", response_model=UploadResponse)
 async def upload_files(
     files: List[UploadFile] = File(..., description="Files to upload (PDF/DOCX/PPTX/TXT/JPG/PNG)"),
@@ -136,7 +165,6 @@ async def upload_files(
         allowed_extensions = {'.pdf', '.docx', '.pptx', '.txt', '.jpg', '.jpeg', '.png'}
         
         for file in files:
-            # Fix: Use filename instead of name, and add proper null checking
             if not file.filename:
                 raise HTTPException(
                     status_code=400, 
@@ -152,8 +180,6 @@ async def upload_files(
         
         # Upload files
         upload_results = engine.upload_files(files)
-        
-        # Debug: Log the upload results to see what's being returned
         logger.info(f"Upload results: {upload_results}")
         
         success_count = sum(1 for result in upload_results if result.get('status') == 'success')
@@ -177,7 +203,7 @@ async def process_query(
     request: QueryRequest,
     engine: DocumentSearchEngine = Depends(get_engine)
 ):
-    """Process a search query with specified action"""
+    """Process a search query with specified action and optional translation"""
     try:
         # Validate action
         valid_actions = ['search', 'explore', 'think']
@@ -187,8 +213,27 @@ async def process_query(
                 detail=f"Invalid action '{request.action}'. Valid actions: {', '.join(valid_actions)}"
             )
         
+        # Validate language if provided for translatable actions
+        if (request.translate_to and 
+            request.translate_to != 'en' and 
+            request.action.lower() in ['search', 'think']):
+            
+            if not is_supported_language(request.translate_to):
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Unsupported language: {request.translate_to}. Supported: {list(get_supported_languages().keys())}"
+                )
+        
         # Process the query
         result = engine.process_query(request.query, request.action)
+        
+        # Apply translation only for search and think actions
+        if (request.translate_to and 
+            request.translate_to != 'en' and 
+            request.action.lower() in ['search', 'think']):
+            
+            logger.info(f"Translating response to {request.translate_to} for action {request.action}")
+            result = translate_response(result, request.translate_to)
         
         if not result['success']:
             return QueryResponse(
@@ -197,7 +242,8 @@ async def process_query(
                 results=[],
                 action=request.action,
                 timestamp=datetime.now().isoformat(),
-                query=request.query
+                query=request.query,
+                translation=TranslationInfo(**result['translation']) if 'translation' in result else None
             )
         
         return QueryResponse(
@@ -206,7 +252,8 @@ async def process_query(
             results=result['results'],
             action=request.action,
             timestamp=datetime.now().isoformat(),
-            query=request.query
+            query=request.query,
+            translation=TranslationInfo(**result['translation']) if 'translation' in result else None
         )
         
     except HTTPException:
@@ -221,10 +268,11 @@ async def process_query_get(
     q: str = Query(..., description="Search query"),
     action: str = Query("search", description="Action type: search, explore, or think"),
     threshold: float = Query(0.35, description="Similarity threshold"),
+    translate_to: str = Query('en', description="Target language (only for search/think)"),
     engine: DocumentSearchEngine = Depends(get_engine)
 ):
     """Process a search query via GET request (for simple frontend integration)"""
-    request = QueryRequest(query=q, action=action, threshold=threshold)
+    request = QueryRequest(query=q, action=action, threshold=threshold, translate_to=translate_to)
     return await process_query(request, engine)
 
 @app.get("/documents", response_model=DocumentsResponse)
@@ -262,12 +310,16 @@ async def reload_documents(engine: DocumentSearchEngine = Depends(get_engine)):
         logger.error(f"Failed to reload documents: {e}")
         raise HTTPException(status_code=500, detail="Failed to reload documents")
 
+# ---------------------------
+# Dedicated Endpoints with Translation Support
+# ---------------------------
+
 @app.post("/search", response_model=QueryResponse)
 async def search_documents(
     request: QueryRequest,
     engine: DocumentSearchEngine = Depends(get_engine)
 ):
-    """Dedicated search endpoint"""
+    """Dedicated search endpoint with translation support"""
     request.action = "search"
     return await process_query(request, engine)
 
@@ -276,8 +328,9 @@ async def explore_documents(
     request: QueryRequest,
     engine: DocumentSearchEngine = Depends(get_engine)
 ):
-    """Dedicated explore endpoint (includes web search)"""
+    """Dedicated explore endpoint (NO translation - keeps original language)"""
     request.action = "explore"
+    # Note: Translation is ignored for explore action
     return await process_query(request, engine)
 
 @app.post("/think", response_model=QueryResponse)
@@ -285,7 +338,7 @@ async def think_documents(
     request: QueryRequest,
     engine: DocumentSearchEngine = Depends(get_engine)
 ):
-    """Dedicated think endpoint (generates refined insights)"""
+    """Dedicated think endpoint with translation support"""
     request.action = "think"
     return await process_query(request, engine)
 
@@ -293,10 +346,11 @@ async def think_documents(
 async def search_documents_get(
     q: str = Query(..., description="Search query"),
     threshold: float = Query(0.35, description="Similarity threshold"),
+    translate_to: str = Query('en', description="Target language for translation"),
     engine: DocumentSearchEngine = Depends(get_engine)
 ):
-    """Search documents via GET request"""
-    return await process_query_get(q, "search", threshold, engine)
+    """Search documents via GET request with translation"""
+    return await process_query_get(q, "search", threshold, translate_to, engine)
 
 @app.get("/explore", response_model=QueryResponse)
 async def explore_documents_get(
@@ -304,17 +358,18 @@ async def explore_documents_get(
     threshold: float = Query(0.35, description="Similarity threshold"),
     engine: DocumentSearchEngine = Depends(get_engine)
 ):
-    """Explore documents via GET request"""
-    return await process_query_get(q, "explore", threshold, engine)
+    """Explore documents via GET request (NO translation)"""
+    return await process_query_get(q, "explore", threshold, 'en', engine)
 
 @app.get("/think", response_model=QueryResponse)
 async def think_documents_get(
     q: str = Query(..., description="Search query"),
     threshold: float = Query(0.35, description="Similarity threshold"),
+    translate_to: str = Query('en', description="Target language for translation"),
     engine: DocumentSearchEngine = Depends(get_engine)
 ):
-    """Think about documents via GET request"""
-    return await process_query_get(q, "think", threshold, engine)
+    """Think about documents via GET request with translation"""
+    return await process_query_get(q, "think", threshold, translate_to, engine)
 
 @app.delete("/reset")
 async def reset_system():
@@ -365,7 +420,7 @@ async def general_exception_handler(request, exc):
 @app.on_event("startup")
 async def startup_event():
     """Initialize the application on startup"""
-    logger.info("🚀 Starting Smart Document Search API...")
+    logger.info("🚀 Starting Smart Document Search API with Translation...")
     try:
         # Initialize search engine
         engine = get_search_engine()
@@ -375,6 +430,13 @@ async def startup_event():
             logger.info(f"✅ Search engine initialized with {health['document_count']} documents")
         else:
             logger.warning(f"⚠️ Search engine status: {health['status']}")
+            
+        # Test translation service
+        try:
+            languages = get_supported_languages()
+            logger.info(f"✅ Translation service initialized with {len(languages)} languages")
+        except Exception as e:
+            logger.warning(f"⚠️ Translation service error: {e}")
             
     except Exception as e:
         logger.error(f"❌ Startup failed: {e}")
@@ -395,12 +457,25 @@ async def get_status(engine: DocumentSearchEngine = Depends(get_engine)):
         health = engine.health_check()
         doc_info = engine.get_documents_info()
         
+        # Test translation service
+        try:
+            translation_status = {
+                "available": True,
+                "supported_languages": len(get_supported_languages())
+            }
+        except Exception as e:
+            translation_status = {
+                "available": False,
+                "error": str(e)
+            }
+        
         return {
             "api_status": "running",
             "search_engine_status": health['status'],
             "total_documents": doc_info['total_documents'],
             "clusters": doc_info['clusters'],
             "has_embeddings": health['has_embeddings'],
+            "translation_service": translation_status,
             "timestamp": datetime.now().isoformat(),
             "uptime": "Available in production version"
         }
@@ -419,9 +494,9 @@ if __name__ == "__main__":
     import uvicorn
     
     # Configuration
-    HOST = os.getenv("HOST", "127.0.0.1")  # Change default if needed
-    PORT = int(os.getenv("PORT", 8080))     # Change default if needed
-    DEBUG = os.getenv("DEBUG", "true").lower() == "true"  # Enable debug by default
+    HOST = os.getenv("HOST", "127.0.0.1")
+    PORT = int(os.getenv("PORT", 8080))
+    DEBUG = os.getenv("DEBUG", "true").lower() == "true"
     
     logger.info(f"Starting server on {HOST}:{PORT}")
     uvicorn.run(

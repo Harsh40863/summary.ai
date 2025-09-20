@@ -10,4 +10,5 @@ pdfplumber
 pymupdf 
 pillow 
 pytesseract
-
+redis==4.5.4
+requests==2.31.0

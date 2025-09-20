@@ -13,6 +13,7 @@ from sklearn.cluster import KMeans
 from PyPDF2 import PdfReader
 from docx import Document as DocxDocument
 from pptx import Presentation
+from sklearn.metrics.pairwise import cosine_similarity
 
 # Custom modules
 from text_preprocessing.cleaner import clean_text
@@ -135,7 +136,7 @@ class DocumentSearchEngine:
         except requests.exceptions.RequestException as e:
             return {"error": str(e)}
     
-    def find_relevant_documents(self, query: str, threshold: float = 0.35) -> List[Dict[str, Any]]:
+    def find_relevant_documents(self, query: str, threshold: float = 0.80) -> List[Dict[str, Any]]:
         """
         Find documents relevant to the query
         
@@ -157,7 +158,8 @@ class DocumentSearchEngine:
                 continue
             
             sentence_embeddings = get_embeddings(sentences)
-            sim_scores = np.dot(sentence_embeddings, query_embedding.T).flatten()
+            # Use cosine similarity instead of dot product
+            sim_scores = cosine_similarity(sentence_embeddings, query_embedding).flatten()
             best_score = np.max(sim_scores)
             best_idx = np.argmax(sim_scores)
             
@@ -182,7 +184,9 @@ class DocumentSearchEngine:
             })
         
         # Sort by score (highest first)
-        return sorted(relevant_results, key=lambda x: x["score"], reverse=True)
+        # Return only top 5 most relevant results
+            sorted_results = sorted(relevant_results, key=lambda x: x["score"], reverse=True)
+            return sorted_results[:5]
     
     def search_action(self, query: str) -> Dict[str, Any]:
         """
