@@ -15,7 +15,7 @@ if not GOOGLE_API_KEY:
 
 # ✅ This now uses google-generativeai Gemini SDK (not v1beta!)
 llm = ChatGoogleGenerativeAI(
-    model="gemini-1.5-pro-001",  # This exact string is required!
+    model="gemini-1.5-flash",  # This exact string is required!
     temperature=0.8,
     google_api_key=GOOGLE_API_KEY
 )
