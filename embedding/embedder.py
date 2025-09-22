@@ -1,7 +1,8 @@
 from sentence_transformers import SentenceTransformer
 from PIL import Image
 
-# Load the CLIP model once
+# Load models once
+text_model = SentenceTransformer("all-MiniLM-L6-v2")
 clip_model = SentenceTransformer("clip-ViT-B-32")
 
 
@@ -23,16 +24,16 @@ def get_embeddings(data, type: str = "text"):
         For a list of inputs -> shape (n, dim)
     """
     if type == "text":
-        # single string → wrap; list of strings → pass directly
+        # Use all-MiniLM-L6-v2 for text (handles longer text better)
         if isinstance(data, str):
-            return clip_model.encode([data], convert_to_numpy=True)[0]
+            return text_model.encode([data], convert_to_numpy=True)[0]
         elif isinstance(data, list) and all(isinstance(x, str) for x in data):
-            return clip_model.encode(data, convert_to_numpy=True)
+            return text_model.encode(data, convert_to_numpy=True)
         else:
             raise TypeError("For type='text', data must be str or list[str]")
 
     elif type == "image":
-        # single PIL.Image → wrap; list of PIL.Images → pass directly
+        # Use CLIP for images
         if isinstance(data, Image.Image):
             return clip_model.encode([data], convert_to_numpy=True)[0]
         elif isinstance(data, list) and all(isinstance(x, Image.Image) for x in data):

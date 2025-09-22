@@ -195,17 +195,18 @@ class DocumentSearchEngine:
         sorted_results = sorted(relevant_results, key=lambda x: x["score"], reverse=True)
         return sorted_results[:5]
     
-    def search_action(self, query: str) -> Dict[str, Any]:
+    def search_action(self, query: str, threshold: float = 0.75) -> Dict[str, Any]:
         """
         Perform search action - returns document summaries
         
         Args:
             query: Search query string
+            threshold: Similarity threshold for relevance
             
         Returns:
             Dictionary with search results and metadata
         """
-        relevant_results = self.find_relevant_documents(query)
+        relevant_results = self.find_relevant_documents(query, threshold)
         
         if not relevant_results:
             return {
@@ -232,17 +233,18 @@ class DocumentSearchEngine:
             "action": "search"
         }
     
-    def explore_action(self, query: str) -> Dict[str, Any]:
+    def explore_action(self, query: str, threshold: float = 0.75) -> Dict[str, Any]:
         """
         Perform explore action - combines document insights with web search
         
         Args:
             query: Search query string
+            threshold: Similarity threshold for relevance
             
         Returns:
             Dictionary with exploration results
         """
-        relevant_results = self.find_relevant_documents(query)
+        relevant_results = self.find_relevant_documents(query, threshold)
         
         if not relevant_results:
             return {
@@ -287,17 +289,18 @@ class DocumentSearchEngine:
             "action": "explore"
         }
     
-    def think_action(self, query: str) -> Dict[str, Any]:
+    def think_action(self, query: str, threshold: float = 0.75) -> Dict[str, Any]:
         """
         Perform think action - generates refined insights using Google Gen AI
         
         Args:
             query: Search query string
+            threshold: Similarity threshold for relevance
             
         Returns:
             Dictionary with thinking results
         """
-        relevant_results = self.find_relevant_documents(query)
+        relevant_results = self.find_relevant_documents(query, threshold)
         
         if not relevant_results:
             return {
@@ -339,13 +342,14 @@ class DocumentSearchEngine:
             "action": "think"
         }
     
-    def process_query(self, query: str, action: str) -> Dict[str, Any]:
+    def process_query(self, query: str, action: str, threshold: float = 0.75) -> Dict[str, Any]:
         """
         Main method to process query with specified action
         
         Args:
             query: Search query string
             action: Action type ("search", "explore", "think", "ppt")
+            threshold: Similarity threshold for document relevance
             
         Returns:
             Dictionary with results based on action type
@@ -360,13 +364,13 @@ class DocumentSearchEngine:
         action = action.lower().strip()
         
         if action == "search":
-            return self.search_action(query)
+            return self.search_action(query, threshold)
         elif action == "explore":
-            return self.explore_action(query)
+            return self.explore_action(query, threshold)
         elif action == "think":
-            return self.think_action(query)
+            return self.think_action(query, threshold)
         elif action == "ppt":
-            return self.generate_ppt_action(query)
+            return self.generate_ppt_action(query, threshold)
         else:
             return {
                 "success": False,
@@ -733,13 +737,17 @@ class DocumentSearchEngine:
         prs.save(file_path)
         return file_path
 
-    def generate_ppt_action(self, query: str) -> Dict[str, Any]:
+    def generate_ppt_action(self, query: str, threshold: float = 0.75) -> Dict[str, Any]:
         """
         Generate a decorative PPT using the best RAG summary for the query.
 
+        Args:
+            query: Search query string
+            threshold: Similarity threshold for relevance
+
         Returns a dict containing path and metadata of the generated PPT.
         """
-        relevant_results = self.find_relevant_documents(query)
+        relevant_results = self.find_relevant_documents(query, threshold)
 
         if not relevant_results:
             return {

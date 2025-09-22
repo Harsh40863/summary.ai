@@ -225,7 +225,7 @@ async def process_query(
                 )
         
         # Process the query
-        result = engine.process_query(request.query, request.action)
+        result = engine.process_query(request.query, request.action, request.threshold)
         
         # Apply translation only for search and think actions
         if (request.translate_to and 
