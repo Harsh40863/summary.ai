@@ -8,9 +8,33 @@ from pptx import Presentation
 from hashlib import md5
 from pymongo import ASCENDING
 import io
+import re
+import unicodedata
 
 # your embedding function
 from embedding.embedder import get_embeddings
+
+def clean_text_for_utf8(text: str) -> str:
+    """
+    Clean text to ensure it's valid UTF-8 for MongoDB storage.
+    Removes or replaces problematic characters.
+    """
+    if not text:
+        return ""
+    
+    # Normalize unicode characters
+    text = unicodedata.normalize('NFKD', text)
+    
+    # Remove or replace control characters and problematic unicode
+    text = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', text)  # Remove control chars
+    text = re.sub(r'[\uFFFD]', '', text)  # Remove replacement characters
+    text = re.sub(r'[^\x20-\x7E\u00A0-\uFFFF]', ' ', text)  # Replace non-printable with space
+    
+    # Clean up whitespace
+    text = re.sub(r'\s+', ' ', text)  # Multiple spaces to single
+    text = text.strip()
+    
+    return text
 
 # --- MongoDB connection ---
 uri = "mongodb+srv://harshvaishnav0314:Harsh40863@cluster0.aqqqpes.mongodb.net/"
@@ -54,12 +78,18 @@ def upload_file_to_db(file_obj):
                     text += page_text + "\n"
 
         if text.strip():
-            text_hash = md5(text.encode("utf-8")).hexdigest()
-            embedding = get_embeddings([text])[0].tolist()
+            # Clean text for UTF-8 compatibility
+            cleaned_text = clean_text_for_utf8(text)
+            if not cleaned_text.strip():
+                result["message"] += "No valid text content found after cleaning. "
+                return result
+                
+            text_hash = md5(cleaned_text.encode("utf-8")).hexdigest()
+            embedding = get_embeddings([cleaned_text])[0].tolist()
             try:
                 pdf_collection.insert_one({
                     "filename": filename,
-                    "text": text,
+                    "text": cleaned_text,
                     "text_hash": text_hash,
                     "embedding": embedding
                 })
@@ -100,12 +130,18 @@ def upload_file_to_db(file_obj):
         doc = DocxDocument(io.BytesIO(file_content))
         text = "\n".join([para.text for para in doc.paragraphs if para.text.strip()])
         if text.strip():
-            text_hash = md5(text.encode("utf-8")).hexdigest()
-            embedding = get_embeddings([text])[0].tolist()
+            # Clean text for UTF-8 compatibility
+            cleaned_text = clean_text_for_utf8(text)
+            if not cleaned_text.strip():
+                result["message"] = "No valid text content found after cleaning."
+                return result
+                
+            text_hash = md5(cleaned_text.encode("utf-8")).hexdigest()
+            embedding = get_embeddings([cleaned_text])[0].tolist()
             try:
                 pdf_collection.insert_one({
                     "filename": filename,
-                    "text": text,
+                    "text": cleaned_text,
                     "text_hash": text_hash,
                     "embedding": embedding
                 })
@@ -125,12 +161,18 @@ def upload_file_to_db(file_obj):
                     text_runs.append(shape.text)
         text = "\n".join(text_runs)
         if text.strip():
-            text_hash = md5(text.encode("utf-8")).hexdigest()
-            embedding = get_embeddings([text])[0].tolist()
+            # Clean text for UTF-8 compatibility
+            cleaned_text = clean_text_for_utf8(text)
+            if not cleaned_text.strip():
+                result["message"] = "No valid text content found after cleaning."
+                return result
+                
+            text_hash = md5(cleaned_text.encode("utf-8")).hexdigest()
+            embedding = get_embeddings([cleaned_text])[0].tolist()
             try:
                 pdf_collection.insert_one({
                     "filename": filename,
-                    "text": text,
+                    "text": cleaned_text,
                     "text_hash": text_hash,
                     "embedding": embedding
                 })
@@ -144,12 +186,18 @@ def upload_file_to_db(file_obj):
     elif ext == "txt":
         text = file_content.decode("utf-8", errors="ignore")
         if text.strip():
-            text_hash = md5(text.encode("utf-8")).hexdigest()
-            embedding = get_embeddings([text])[0].tolist()
+            # Clean text for UTF-8 compatibility
+            cleaned_text = clean_text_for_utf8(text)
+            if not cleaned_text.strip():
+                result["message"] = "No valid text content found after cleaning."
+                return result
+                
+            text_hash = md5(cleaned_text.encode("utf-8")).hexdigest()
+            embedding = get_embeddings([cleaned_text])[0].tolist()
             try:
                 pdf_collection.insert_one({
                     "filename": filename,
-                    "text": text,
+                    "text": cleaned_text,
                     "text_hash": text_hash,
                     "embedding": embedding
                 })

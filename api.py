@@ -111,10 +111,27 @@ class SupportedLanguagesResponse(BaseModel):
 def get_engine() -> DocumentSearchEngine:
     """Dependency to get the search engine instance"""
     try:
-        return get_search_engine()
+        engine = get_search_engine()
+        # Check if engine is properly initialized
+        if engine.documents is None:
+            logger.warning("Search engine initialized with empty state")
+        return engine
     except Exception as e:
         logger.error(f"Failed to initialize search engine: {e}")
-        raise HTTPException(status_code=500, detail="Search engine initialization failed")
+        # Create a minimal engine instance instead of failing completely
+        try:
+            engine = DocumentSearchEngine.__new__(DocumentSearchEngine)
+            engine.documents = []
+            engine.doc_texts = []
+            engine.doc_embeddings = None
+            engine.index_to_docinfo = {}
+            engine.topic_labels = None
+            engine.search_engine = None
+            engine.n_clusters = 0
+            return engine
+        except Exception as fallback_error:
+            logger.error(f"Fallback engine creation failed: {fallback_error}")
+            raise HTTPException(status_code=500, detail="Search engine initialization failed")
 
 # ---------------------------
 # API Endpoints

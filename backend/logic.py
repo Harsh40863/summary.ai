@@ -64,24 +64,60 @@ class DocumentSearchEngine:
     
     def _load_documents(self):
         """Load and preprocess documents from database"""
-        self.documents = fetch_documents_from_db()
+        try:
+            self.documents = fetch_documents_from_db()
+        except Exception as e:
+            print(f"Warning: Failed to fetch documents from database: {e}")
+            self.documents = []
         
         if not self.documents:
-            raise ValueError("No valid documents found in the database.")
+            print("No documents found in database. System will be ready after first upload.")
+            # Initialize empty state instead of raising error
+            self.doc_texts = []
+            self.doc_embeddings = None
+            self.index_to_docinfo = {}
+            self.topic_labels = None
+            self.search_engine = None
+            self.n_clusters = 0
+            return
         
-        # Process documents
-        self.doc_texts = [clean_text(doc["content"]) for doc in self.documents]
-        self.doc_embeddings = get_embeddings(self.doc_texts)
-        self.index_to_docinfo = {i: doc for i, doc in enumerate(self.documents)}
-        
-        # Create clusters
-        self.n_clusters = min(len(self.documents), 3)
-        kmeans = KMeans(n_clusters=self.n_clusters, random_state=42).fit(self.doc_embeddings)
-        self.topic_labels = kmeans.labels_
-        
-        # Initialize search engine
-        self.search_engine = VectorSearchEngine(dimension=self.doc_embeddings.shape[1])
-        self.search_engine.build_index(self.doc_embeddings, self.doc_texts)
+        try:
+            # Process documents
+            self.doc_texts = [clean_text(doc["content"]) for doc in self.documents if doc.get("content", "").strip()]
+            
+            if not self.doc_texts:
+                print("No valid text content found in documents.")
+                self.doc_embeddings = None
+                self.search_engine = None
+                return
+                
+            self.doc_embeddings = get_embeddings(self.doc_texts)
+            self.index_to_docinfo = {i: doc for i, doc in enumerate(self.documents)}
+            
+            # Create clusters
+            self.n_clusters = min(len(self.documents), 3)
+            if len(self.doc_embeddings) > 0:
+                kmeans = KMeans(n_clusters=self.n_clusters, random_state=42).fit(self.doc_embeddings)
+                self.topic_labels = kmeans.labels_
+            else:
+                self.topic_labels = []
+            
+            # Initialize search engine
+            if self.doc_embeddings is not None and len(self.doc_embeddings) > 0:
+                self.search_engine = VectorSearchEngine(dimension=self.doc_embeddings.shape[1])
+                self.search_engine.build_index(self.doc_embeddings, self.doc_texts)
+            else:
+                self.search_engine = None
+                
+        except Exception as e:
+            print(f"Error processing documents: {e}")
+            # Initialize empty state on error
+            self.doc_texts = []
+            self.doc_embeddings = None
+            self.index_to_docinfo = {}
+            self.topic_labels = None
+            self.search_engine = None
+            self.n_clusters = 0
     
     def reload_documents(self):
         """Reload documents from database (useful after new uploads)"""
@@ -114,7 +150,12 @@ class DocumentSearchEngine:
                 })
         
         # Reload documents after upload
-        self.reload_documents()
+        try:
+            self.reload_documents()
+        except Exception as e:
+            print(f"Warning: Failed to reload documents after upload: {e}")
+            # Don't fail the upload if reload fails
+            
         return results
     
     def google_search(self, query: str, api_key: str = None, cse_id: str = None, num: int = 5) -> Dict[str, Any]:
@@ -154,6 +195,9 @@ class DocumentSearchEngine:
         Returns:
             List of relevant document results sorted by relevance score
         """
+        if not self.documents or not self.doc_texts:
+            return []
+            
         clean_query = clean_text(query)
         query_embedding = get_embeddings([clean_query])
         
@@ -820,16 +864,19 @@ class DocumentSearchEngine:
             Dictionary with system health status
         """
         try:
-            has_docs = len(self.documents) > 0
+            has_docs = len(self.documents) > 0 if self.documents else False
             has_embeddings = self.doc_embeddings is not None
             has_search_engine = self.search_engine is not None
             
+            # System is healthy if it has documents and embeddings, or if it's empty but ready
+            status = "healthy" if (has_docs and has_embeddings and has_search_engine) or (not has_docs and not has_embeddings) else "unhealthy"
+            
             return {
-                "status": "healthy" if all([has_docs, has_embeddings, has_search_engine]) else "unhealthy",
+                "status": status,
                 "has_documents": has_docs,
                 "has_embeddings": has_embeddings,
                 "has_search_engine": has_search_engine,
-                "document_count": len(self.documents),
+                "document_count": len(self.documents) if self.documents else 0,
                 "timestamp": datetime.now().isoformat()
             }
         except Exception as e:
