@@ -1,38 +1,21 @@
+
 # Environment variables
+# IDEs
+# Node/Frontend
+# OS Files
+# Python
+*.dylib
+*.pyc
+.DS_Store
 .env
 .env.*
-
-# Python
-venv/
-__pycache__/
-*.pyc
-.pytest_cache/
-
-# Node/Frontend
-node_modules/
-dist/
-build/
-.npm/
-
-# OS Files
-.DS_Store
-
-# IDEs
-.vscode/
 .idea/
+.npm/
+.pytest_cache/
 .venv/
-venv/
+.vscode/
 __pycache__/
-*.pyc
+build/
+dist/
 node_modules/
-.env
-*.dylib
-
-.venv/
 venv/
-__pycache__/
-*.pyc
-node_modules/
-.env
-*.dylib
-
