@@ -6,6 +6,7 @@ motor
 python-dotenv
 python-jose[cryptography]
 passlib[bcrypt]
+bcrypt==3.2.0
 email-validator
 dnspython
 pdfplumber==0.10.3
