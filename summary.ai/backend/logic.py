@@ -282,11 +282,11 @@ class DocumentSearchEngine:
             
             relevant_results.append({
                 "doc": doc,
-                "best_sentence": sentences[best_idx],
+                "best_sentence": best_sentence,
                 "score": float(best_score),  # Convert to Python float
                 "relevant_chunk": relevant_chunk,
                 "summary": query_summary,
-                "doc_index": idx
+                "doc_index": int(idx)
             })
         
         # Sort by score (highest first)
