@@ -310,6 +310,7 @@ def fetch_documents_from_db(user_email: Optional[str] = None) -> list[Dict[str, 
                 "content": doc.get("text", ""),
                 "metadata": metadata,
                 "uploaded_at": doc.get("uploaded_at"),
+                "embedding": doc.get("embedding"),
             })
     except Exception as e:
         print(f"Warning: Failed to fetch documents from database: {e}")

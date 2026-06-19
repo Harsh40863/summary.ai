@@ -84,7 +84,28 @@ class DocumentSearchEngine:
         
         try:
             # Process documents
-            self.doc_texts = [clean_text(doc["content"]) for doc in self.documents if doc.get("content", "").strip()]
+            valid_docs = []
+            self.doc_texts = []
+            embeddings = []
+            texts_to_embed = []
+            indices_to_embed = []
+            
+            for doc in self.documents:
+                text = doc.get("content", "")
+                if text.strip():
+                    cleaned = clean_text(text)
+                    valid_docs.append(doc)
+                    self.doc_texts.append(cleaned)
+                    
+                    if doc.get("embedding"):
+                        embeddings.append(doc["embedding"])
+                    else:
+                        embeddings.append(None)
+                        texts_to_embed.append(cleaned)
+                        indices_to_embed.append(len(embeddings) - 1)
+            
+            # Update self.documents to only include valid docs to stay in sync
+            self.documents = valid_docs
             
             if not self.doc_texts:
                 print("No valid text content found in documents.")
@@ -92,7 +113,12 @@ class DocumentSearchEngine:
                 self.search_engine = None
                 return
                 
-            self.doc_embeddings = get_embeddings(self.doc_texts)
+            if texts_to_embed:
+                new_embs = get_embeddings(texts_to_embed)
+                for i, idx in enumerate(indices_to_embed):
+                    embeddings[idx] = new_embs[i]
+                    
+            self.doc_embeddings = np.array(embeddings)
             self.index_to_docinfo = {i: doc for i, doc in enumerate(self.documents)}
             
             # Create clusters
