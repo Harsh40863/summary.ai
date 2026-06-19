@@ -10,6 +10,10 @@ import logging
 import traceback
 from datetime import datetime
 import os
+import sys
+
+# Ensure root directory is in python path so 'backend.logic' can be found
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # Import the logic module
 from backend.logic import get_search_engine, reset_search_engine, DocumentSearchEngine
