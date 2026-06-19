@@ -1,0 +1,22 @@
+# Environment variables
+.env
+.env.*
+
+# Python
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Node/Frontend
+node_modules/
+dist/
+build/
+.npm/
+
+# OS Files
+.DS_Store
+
+# IDEs
+.vscode/
+.idea/
