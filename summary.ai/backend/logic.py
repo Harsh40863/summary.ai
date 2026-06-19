@@ -231,28 +231,46 @@ class DocumentSearchEngine:
         relevant_results = []
         candidates = []
         
-        for idx, doc in enumerate(self.documents):
+        # 1. Fast document-level filtering
+        if self.doc_embeddings is not None and len(self.doc_embeddings) > 0:
+            doc_sim_scores = cosine_similarity(self.doc_embeddings, query_embedding).flatten()
+            top_doc_indices = np.argsort(doc_sim_scores)[::-1][:3] # Check top 3 docs
+        else:
+            top_doc_indices = range(min(len(self.documents), 3))
+            
+        # 2. Chunk-level search within top documents
+        for idx in top_doc_indices:
+            doc = self.documents[idx]
             sentences = sent_tokenize(doc["content"])
             if not sentences:
                 continue
+                
+            # Group sentences into chunks of 10 to drastically speed up embedding
+            chunk_size = 10
+            chunks = []
+            for i in range(0, len(sentences), chunk_size):
+                chunk_text = " ".join(sentences[i:i + chunk_size])
+                if chunk_text.strip():
+                    chunks.append(chunk_text)
             
-            sentence_embeddings = get_embeddings(sentences)
-            # Use cosine similarity instead of dot product
-            sim_scores = cosine_similarity(sentence_embeddings, query_embedding).flatten()
+            if not chunks:
+                continue
+                
+            chunk_embeddings = get_embeddings(chunks)
+            sim_scores = cosine_similarity(chunk_embeddings, query_embedding).flatten()
+            
             best_score = np.max(sim_scores)
             best_idx = np.argmax(sim_scores)
             
-            # Get relevant context chunk
-            start = max(0, best_idx - 5)
-            end = min(len(sentences), best_idx + 6)
-            relevant_chunk = " ".join(sentences[start:end])
+            relevant_chunk = chunks[best_idx]
+            best_sentence = sentences[best_idx * chunk_size] if sentences else ""
 
             candidate = {
                 "doc": doc,
-                "best_sentence": sentences[best_idx],
+                "best_sentence": best_sentence,
                 "score": float(best_score),
                 "relevant_chunk": relevant_chunk,
-                "doc_index": idx,
+                "doc_index": int(idx),
             }
             candidates.append(candidate)
 
