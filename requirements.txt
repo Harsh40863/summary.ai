@@ -4,7 +4,7 @@ uvicorn
 pydantic
 motor
 python-dotenv
-pyjwt
+python-jose[cryptography]
 passlib[bcrypt]
 email-validator
 dnspython
