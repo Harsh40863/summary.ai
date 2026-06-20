@@ -5,8 +5,8 @@ import axios from 'axios';
 const RAILWAY_URL = 'https://summaryai-production-bc85.up.railway.app';
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || RAILWAY_URL,
-  timeout: 180000, // 3 minute timeout for heavy ML operations
+  baseURL: RAILWAY_URL,
+  timeout: 120000, // 2 minute timeout — ML operations (search/think) can take time
 });
 
 api.interceptors.request.use((config) => {
@@ -42,10 +42,10 @@ let keepAliveInterval = null;
 export function startKeepAlive() {
   if (keepAliveInterval) return; // already running
   // Ping immediately
-  axios.get(`${import.meta.env.VITE_API_URL || RAILWAY_URL}/ping`).catch(() => {});
+  axios.get(`${RAILWAY_URL}/ping`).catch(() => {});
   // Then every 4 minutes
   keepAliveInterval = setInterval(() => {
-    axios.get(`${import.meta.env.VITE_API_URL || RAILWAY_URL}/ping`).catch(() => {});
+    axios.get(`${RAILWAY_URL}/ping`).catch(() => {});
   }, 4 * 60 * 1000);
 }
 

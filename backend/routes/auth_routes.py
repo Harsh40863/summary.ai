@@ -38,4 +38,4 @@ def read_users_me(current_email: str = Depends(get_current_user)):
     user_doc = users_collection.find_one({"email": current_email})
     if not user_doc:
         raise HTTPException(status_code=404, detail="User not found")
-    return {"name": user_doc["name"], "email": user_doc["email"]}
+    return {"name": user_doc.get("name", ""), "email": user_doc.get("email", "")}
