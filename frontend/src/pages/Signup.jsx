@@ -42,14 +42,12 @@ const Signup = () => {
 
   return (
     <div className="auth-bg">
-      <video
-        className="auth-bg-video"
-        src="/assets/auth-bg-video.mp4"
-        autoPlay
-        loop
-        muted
-        playsInline
-      />
+      <div className="bg-animated">
+        <div className="orb orb-1" />
+        <div className="orb orb-2" />
+        <div className="orb orb-3" />
+        <div className="grid-overlay" />
+      </div>
       <div className="auth-video-overlay" />
       <div className="auth-card">
         <div className="auth-logo">

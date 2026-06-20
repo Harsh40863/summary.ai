@@ -12,6 +12,14 @@ app = FastAPI(title="HackIndia API")
 
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
+CORS_ORIGINS = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "https://summary-lbeqsk5d0-harsh-vaishnav-s-projects.vercel.app",
+    "https://summary-lbeqsk5d0-harsh-vaishnav-s-projects.vercel.app/",
+    FRONTEND_URL,
+]
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

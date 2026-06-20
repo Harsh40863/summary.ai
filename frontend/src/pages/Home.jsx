@@ -5,20 +5,12 @@ import '../styles/home.css';
 const Home = () => {
   return (
     <div className="home-wrapper">
-      {/* 
-        VIDEO SETUP INSTRUCTIONS:
-        Place your background video file at: frontend/public/assets/bg-video.mp4
-        Recommended: dark/tech themed video, 1080p, under 10MB for fast loading
-        Free sources: Pexels.com, Mixkit.co — search "technology", "code", "abstract dark"
-      */}
-      <video
-        className="bg-video"
-        src="/assets/bg-video.mp4"
-        autoPlay
-        loop
-        muted
-        playsInline
-      />
+      <div className="bg-animated">
+        <div className="orb orb-1" />
+        <div className="orb orb-2" />
+        <div className="orb orb-3" />
+        <div className="grid-overlay" />
+      </div>
       <div className="video-overlay" />
       <Navbar />
       <div className="hero-content">

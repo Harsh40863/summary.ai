@@ -16,8 +16,16 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response && error.response.status === 401) {
-      localStorage.removeItem('hackindia_token');
-      window.location.href = '/login';
+      // Only auto-logout if the failed request was NOT a login/signup call
+      // (those naturally return 401 on wrong credentials)
+      const requestUrl = error.config?.url || '';
+      const isAuthCall = requestUrl.includes('/auth/login') || requestUrl.includes('/auth/signup');
+      const isOnProtectedPage = !window.location.pathname.includes('/login') && !window.location.pathname.includes('/signup') && window.location.pathname !== '/';
+      
+      if (!isAuthCall && isOnProtectedPage) {
+        localStorage.removeItem('hackindia_token');
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }

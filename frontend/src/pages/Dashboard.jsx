@@ -151,14 +151,12 @@ const Dashboard = () => {
 
   return (
     <div className="dashboard-wrapper">
-      <video
-        className="dash-bg-video"
-        src="/assets/bg-video.mp4"
-        autoPlay
-        loop
-        muted
-        playsInline
-      />
+      <div className="bg-animated">
+        <div className="orb orb-1" />
+        <div className="orb orb-2" />
+        <div className="orb orb-3" />
+        <div className="grid-overlay" />
+      </div>
       <div className="dash-video-overlay" />
       
       <div className="dash-nav-container">
