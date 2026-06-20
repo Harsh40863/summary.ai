@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import Navbar from '../components/Navbar';
-import api from '../utils/api';
+import api, { startKeepAlive, stopKeepAlive } from '../utils/api';
 import '../styles/dashboard.css';
 
 const Dashboard = () => {
@@ -34,6 +34,8 @@ const Dashboard = () => {
   };
 
   useEffect(() => {
+    startKeepAlive(); // ping Railway every 4min to prevent cold starts
+
     const fetchUser = async () => {
       try {
         const res = await api.get('/auth/me');
@@ -50,10 +52,14 @@ const Dashboard = () => {
         console.error("Failed to fetch languages", err);
       }
     };
+
     fetchUser();
     fetchLanguages();
     fetchDocuments();
+
+    return () => stopKeepAlive(); // cleanup on unmount
   }, []);
+
 
   const handleUpload = async (e) => {
     e.preventDefault();

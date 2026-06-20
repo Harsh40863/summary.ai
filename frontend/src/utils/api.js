@@ -1,8 +1,12 @@
 import axios from 'axios';
 
+// Call Railway DIRECTLY — bypasses Vercel's 30s proxy timeout
+// Railway URL is not secret since we use JWT Bearer tokens for security
+const RAILWAY_URL = 'https://summaryai-production-bc85.up.railway.app';
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '',
-  timeout: 120000, // 2 minute timeout — ML operations (search/think) can take time
+  baseURL: import.meta.env.VITE_API_URL || RAILWAY_URL,
+  timeout: 180000, // 3 minute timeout for heavy ML operations
 });
 
 api.interceptors.request.use((config) => {
@@ -18,7 +22,6 @@ api.interceptors.response.use(
   (error) => {
     if (error.response && error.response.status === 401) {
       // Only auto-logout if the failed request was NOT a login/signup call
-      // (those naturally return 401 on wrong credentials)
       const requestUrl = error.config?.url || '';
       const isAuthCall = requestUrl.includes('/auth/login') || requestUrl.includes('/auth/signup');
       const isOnProtectedPage = !window.location.pathname.includes('/login') && !window.location.pathname.includes('/signup') && window.location.pathname !== '/';
@@ -31,5 +34,26 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+// ─── Keep-alive ping ──────────────────────────────────────────────────────────
+// Pings Railway every 4 minutes to prevent cold starts (Railway sleeps after 5min idle)
+let keepAliveInterval = null;
+
+export function startKeepAlive() {
+  if (keepAliveInterval) return; // already running
+  // Ping immediately
+  axios.get(`${import.meta.env.VITE_API_URL || RAILWAY_URL}/ping`).catch(() => {});
+  // Then every 4 minutes
+  keepAliveInterval = setInterval(() => {
+    axios.get(`${import.meta.env.VITE_API_URL || RAILWAY_URL}/ping`).catch(() => {});
+  }, 4 * 60 * 1000);
+}
+
+export function stopKeepAlive() {
+  if (keepAliveInterval) {
+    clearInterval(keepAliveInterval);
+    keepAliveInterval = null;
+  }
+}
 
 export default api;
