@@ -20,7 +20,9 @@ const Dashboard = () => {
   const [shake, setShake] = useState(false);
   const [queryError, setQueryError] = useState('');
   const [copiedStates, setCopiedStates] = useState({});
+  const [loadingMsg, setLoadingMsg] = useState('Processing...');
   const fileInputRef = useRef(null);
+  const loadingTimerRef = useRef(null);
   
   const fetchDocuments = async () => {
     try {
@@ -108,6 +110,9 @@ const Dashboard = () => {
     setLoading(true);
     setError('');
     setResult(null);
+    setLoadingMsg('Processing...');
+    // After 5s hint that it may take longer
+    loadingTimerRef.current = setTimeout(() => setLoadingMsg('AI is thinking... (may take 30-60s on first run)'), 5000);
     try {
       const res = await api.post('/api/query', { 
         query: prompt,
@@ -117,9 +122,19 @@ const Dashboard = () => {
       });
       setResult(res.data);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Query failed');
+      if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+        setError('⏱️ Request timed out. The AI is still warming up — please try again in 30 seconds.');
+      } else if (err.response?.status === 502 || err.response?.status === 503 || err.response?.status === 504) {
+        setError('🔄 Server is busy or waking up. Please wait 30 seconds and try again.');
+      } else if (!err.response) {
+        setError('🌐 Network error. Check your connection and try again.');
+      } else {
+        setError(err.response?.data?.detail || 'Query failed. Please try again.');
+      }
     } finally {
       setLoading(false);
+      clearTimeout(loadingTimerRef.current);
+      setLoadingMsg('Processing...');
     }
   };
 
@@ -157,6 +172,14 @@ const Dashboard = () => {
         <div className="orb orb-3" />
         <div className="grid-overlay" />
       </div>
+      <video
+        className="dash-bg-video"
+        src="/assets/bg-video.mp4"
+        autoPlay
+        loop
+        muted
+        playsInline
+      />
       <div className="dash-video-overlay" />
       
       <div className="dash-nav-container">
@@ -258,12 +281,13 @@ const Dashboard = () => {
             disabled={loading}
           >
             {loading ? (
-              <div className="loading-dots">
-                <span className="dot"></span>
-                <span className="dot"></span>
-                <span className="dot"></span>
-              </div>
-            ) : 'Generate Magic'}
+            <div className="loading-dots">
+              <span className="dot"></span>
+              <span className="dot"></span>
+              <span className="dot"></span>
+              <span className="loading-label">{loadingMsg}</span>
+            </div>
+          ) : 'Generate Magic'}
           </button>
           
           {result && (

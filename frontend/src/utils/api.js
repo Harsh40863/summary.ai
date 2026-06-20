@@ -1,7 +1,8 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || ''
+  baseURL: import.meta.env.VITE_API_URL || '',
+  timeout: 120000, // 2 minute timeout — ML operations (search/think) can take time
 });
 
 api.interceptors.request.use((config) => {

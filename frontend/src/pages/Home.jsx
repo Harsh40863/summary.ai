@@ -11,6 +11,14 @@ const Home = () => {
         <div className="orb orb-3" />
         <div className="grid-overlay" />
       </div>
+      <video
+        className="bg-video"
+        src="/assets/bg-video.mp4"
+        autoPlay
+        loop
+        muted
+        playsInline
+      />
       <div className="video-overlay" />
       <Navbar />
       <div className="hero-content">
