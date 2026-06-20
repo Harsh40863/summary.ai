@@ -234,9 +234,9 @@ class DocumentSearchEngine:
         # 1. Fast document-level filtering
         if self.doc_embeddings is not None and len(self.doc_embeddings) > 0:
             doc_sim_scores = cosine_similarity(self.doc_embeddings, query_embedding).flatten()
-            top_doc_indices = np.argsort(doc_sim_scores)[::-1][:3] # Check top 3 docs
+            top_doc_indices = np.argsort(doc_sim_scores)[::-1][:2] # Check top 2 docs to prevent timeout
         else:
-            top_doc_indices = range(min(len(self.documents), 3))
+            top_doc_indices = range(min(len(self.documents), 2))
             
         # 2. Chunk-level search within top documents
         for idx in top_doc_indices:
@@ -255,6 +255,10 @@ class DocumentSearchEngine:
             
             if not chunks:
                 continue
+                
+            # Limit chunks to prevent massive computation time on very long PDFs
+            # 100 chunks * 10 sentences = 1000 sentences max per document
+            chunks = chunks[:100]
                 
             chunk_embeddings = get_embeddings(chunks)
             sim_scores = cosine_similarity(chunk_embeddings, query_embedding).flatten()
