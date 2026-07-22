@@ -13,7 +13,7 @@ from sklearn.cluster import KMeans
 from PyPDF2 import PdfReader
 from docx import Document as DocxDocument
 from pptx import Presentation
-from sklearn.metrics.pairwise import cosine_similarity
+
 from pptx.util import Inches, Pt
 from pptx.dml.color import RGBColor
 from pptx.enum.text import PP_ALIGN
@@ -231,12 +231,12 @@ class DocumentSearchEngine:
         relevant_results = []
         candidates = []
         
-        # 1. Fast document-level filtering
-        if self.doc_embeddings is not None and len(self.doc_embeddings) > 0:
-            doc_sim_scores = cosine_similarity(self.doc_embeddings, query_embedding).flatten()
-            top_doc_indices = np.argsort(doc_sim_scores)[::-1][:2] # Check top 2 docs to prevent timeout
+        # 1. Fast document-level filtering via FAISS index
+        if self.search_engine is not None and self.search_engine.index.ntotal > 0:
+            faiss_results = self.search_engine.search(query_embedding, top_k=2)
+            top_doc_indices = [idx for idx, _score, _text in faiss_results]
         else:
-            top_doc_indices = range(min(len(self.documents), 2))
+            top_doc_indices = list(range(min(len(self.documents), 2)))
             
         # 2. Chunk-level search within top documents
         for idx in top_doc_indices:
@@ -261,12 +261,14 @@ class DocumentSearchEngine:
             chunks = chunks[:100]
                 
             chunk_embeddings = get_embeddings(chunks)
-            sim_scores = cosine_similarity(chunk_embeddings, query_embedding).flatten()
+            # Use a temporary FAISS index for chunk-level search
+            chunk_search = VectorSearchEngine.from_embeddings(chunk_embeddings, chunks)
+            chunk_results = chunk_search.search(query_embedding, top_k=1)
             
-            best_score = np.max(sim_scores)
-            best_idx = np.argmax(sim_scores)
+            if not chunk_results:
+                continue
             
-            relevant_chunk = chunks[best_idx]
+            best_idx, best_score, relevant_chunk = chunk_results[0]
             best_sentence = sentences[best_idx * chunk_size] if sentences else ""
 
             candidate = {
