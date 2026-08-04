@@ -231,8 +231,8 @@ class DocumentSearchEngine:
         relevant_results = []
         candidates = []
         
-        # 1. Fast document-level filtering via FAISS index
-        if self.search_engine is not None and self.search_engine.index.ntotal > 0:
+        # 1. Fast document-level filtering via search engine index
+        if self.search_engine is not None and self.search_engine.ntotal > 0:
             faiss_results = self.search_engine.search(query_embedding, top_k=2)
             top_doc_indices = [idx for idx, _score, _text in faiss_results]
         else:

@@ -11,8 +11,6 @@ load_dotenv(dotenv_path=env_path)
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-flash-latest")
 
-if not GOOGLE_API_KEY:
-    raise EnvironmentError("GOOGLE_API_KEY is missing!")
 
 def generate_answer_with_google(query, summary, doc_name, action_type="search"):
     context = f"From document '{doc_name}':\n{summary}\n"

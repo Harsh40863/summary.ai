@@ -67,13 +67,14 @@ def ping():
 
 @app.on_event("startup")
 def startup_event():
-    # Pre-load the model during startup so the first query doesn't timeout
-    import sys
-    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../summary.ai')))
+    # Attempt to pre-load the embedding model during startup (best-effort, non-blocking)
     try:
+        import sys
+        sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../summary.ai')))
         from embedding.embedder import _get_text_model
-        print("Pre-loading SentenceTransformer model...")
+        print("Pre-loading embedding model...")
         _get_text_model()
         print("Model pre-loaded successfully!")
     except Exception as e:
-        print(f"Failed to pre-load model: {e}")
+        print(f"Note: ML model not pre-loaded (will use fallback): {e}")
+
