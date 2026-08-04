@@ -1,8 +1,14 @@
 import sys
 import os
 
-# Add summary.ai to path to import its modules
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../summary.ai')))
+# Resolve paths relative to this file so imports work from any working directory (e.g. Vercel)
+_routes_dir = os.path.dirname(os.path.abspath(__file__))   # backend/routes/
+_backend_dir = os.path.dirname(_routes_dir)                  # backend/
+_project_root = os.path.dirname(_backend_dir)                # project root
+_summary_ai_dir = os.path.join(_project_root, "summary.ai") # summary.ai/
+for _p in [_backend_dir, _summary_ai_dir]:
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
 from fastapi import APIRouter, HTTPException, Depends, File, UploadFile
 from typing import List

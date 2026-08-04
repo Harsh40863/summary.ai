@@ -1,4 +1,15 @@
 import os
+import sys
+
+# Ensure the backend directory is on the path so local modules (routes, auth, models, etc.)
+# resolve correctly when Vercel runs this file from the project root /var/task.
+_backend_dir = os.path.dirname(os.path.abspath(__file__))
+_project_root = os.path.dirname(_backend_dir)
+_summary_ai_dir = os.path.join(_project_root, "summary.ai")
+for _p in [_backend_dir, _summary_ai_dir]:
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
 os.environ["HF_HUB_DOWNLOAD_TIMEOUT"] = "120"
 
 from fastapi import FastAPI, Request
