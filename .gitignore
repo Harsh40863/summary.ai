@@ -1,23 +1,75 @@
-
 # Environment variables
-# IDEs
-# Node/Frontend
-# OS Files
-# Python
-*.dylib
-*.pyc
-.DS_Store
 .env
 .env.*
-.idea/
-.npm/
-.pytest_cache/
-.venv/
-.vscode/
-__pycache__/
-build/
-dist/
-node_modules/
-venv/
 backend/.env
-.vercel
+think/.env
+frontend/.env
+frontend/.env.*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Node/Frontend
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+.npm/
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*.dylib
+
+# Vercel
+.vercel/
+
+# Testing/Cache
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# Databases
+*.sqlite3
+*.db

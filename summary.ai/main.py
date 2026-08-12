@@ -18,7 +18,6 @@ from nltk.tokenize import sent_tokenize
 from sklearn.cluster import KMeans
 from PyPDF2 import PdfReader
 from docx import Document as DocxDocument
-from pptx import Presentation
 
 # Custom modules
 from text_preprocessing.cleaner import clean_text

@@ -154,11 +154,22 @@ const Dashboard = () => {
 
   const formatMarkdown = (text) => {
     if (!text) return { __html: '' };
-    let html = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    
+    let html = text;
+    // Only escape if it's not our custom social media HTML from the backend
+    if (!text.includes("social-scroll-container") && !text.includes("social-post")) {
+      html = html.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+    
     html = html.replace(/\*\*(.*?)\*\*/g, '<strong style="color: #6C63FF;">$1</strong>');
     html = html.replace(/^[\s]*[\*\-]\s+(.*)$/gm, '<div style="margin-left: 16px; margin-bottom: 8px;">• $1</div>');
+    
+    // Format raw URLs into badges, avoiding URLs already inside href attribute
+    html = html.replace(/(?<!["'])(https?:\/\/[^\s<]+)/g, '<a class="url-badge" href="$1" target="_blank" rel="noopener noreferrer">🔗 $1</a>');
+    
     html = html.replace(/\n/g, '<br/>');
     html = html.replace(/<br\/>(<div style="margin-left: 16px)/g, '$1');
+    html = html.replace(/<\/div><br\/>/g, '</div>'); // Prevent extra spacing after social cards
     return { __html: html };
   };
 
@@ -185,6 +196,7 @@ const Dashboard = () => {
         loop
         muted
         playsInline
+        onError={(e) => { e.currentTarget.style.display = 'none'; }}
       />
       <div className="dash-video-overlay" />
       
@@ -262,7 +274,6 @@ const Dashboard = () => {
               <option value="search">Search</option>
               <option value="explore">Explore (Web Enhanced)</option>
               <option value="think">Think (AI Insights)</option>
-              <option value="ppt">Generate PPT</option>
             </select>
             
             <select className="dash-select" value={language} onChange={e => setLanguage(e.target.value)}>
@@ -324,9 +335,6 @@ const Dashboard = () => {
                         <div>
                           {typeof item.web_content === 'object' ? JSON.stringify(item.web_content, null, 2) : <div dangerouslySetInnerHTML={formatMarkdown(item.web_content)}></div>}
                         </div>
-                      )}
-                      {item.ppt_path && (
-                        <div style={{ color: '#10B981', marginTop: '8px', fontWeight: '500' }}>✨ PPT Saved: {item.file_name}</div>
                       )}
                     </div>
                   </div>

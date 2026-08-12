@@ -1,0 +1,7 @@
+langchain
+langchain-mistralai
+langchain-core
+requests
+beautifulsoup4
+tavily-python
+python-dotenv

@@ -6,7 +6,8 @@ _routes_dir = os.path.dirname(os.path.abspath(__file__))   # backend/routes/
 _backend_dir = os.path.dirname(_routes_dir)                  # backend/
 _project_root = os.path.dirname(_backend_dir)                # project root
 _summary_ai_dir = os.path.join(_project_root, "summary.ai") # summary.ai/
-for _p in [_backend_dir, _summary_ai_dir]:
+_summary_backend_dir = os.path.join(_summary_ai_dir, "backend")
+for _p in [_summary_backend_dir, _backend_dir, _summary_ai_dir]:
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
@@ -17,7 +18,7 @@ from datetime import datetime
 
 # Import summary.ai models and logic
 from api import QueryRequest, QueryResponse, UploadResponse, SupportedLanguagesResponse, HealthResponse, DocumentsResponse
-from backend.logic import get_search_engine, DocumentSearchEngine
+from logic import get_search_engine, DocumentSearchEngine
 from translation.redis_translator import get_supported_languages
 from uploadmdb.db_ingest import delete_document_from_db
 
@@ -81,7 +82,7 @@ def process_query(
 ):
     try:
         from translation.redis_translator import is_supported_language, translate_response
-        valid_actions = ['search', 'explore', 'think', 'ppt']
+        valid_actions = ['search', 'explore', 'think']
         if request.action.lower() not in valid_actions:
             raise HTTPException(status_code=400, detail=f"Invalid action '{request.action}'")
             

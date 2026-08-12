@@ -34,7 +34,14 @@ const Signup = () => {
       await api.post('/auth/signup', { name, email, password });
       navigate('/login');
     } catch (err) {
-      setError(err.response?.data?.detail || 'Signup failed');
+      const detailMsg = err.response?.data?.detail;
+      if (detailMsg) {
+        setError(detailMsg);
+      } else if (err.code === 'ERR_NETWORK') {
+        setError('Cannot connect to server. Please ensure the backend is running.');
+      } else {
+        setError('Signup failed. Please try again.');
+      }
     } finally {
       setLoading(false);
     }

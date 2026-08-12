@@ -12,14 +12,6 @@ from nltk.tokenize import sent_tokenize
 from sklearn.cluster import KMeans
 from PyPDF2 import PdfReader
 from docx import Document as DocxDocument
-from pptx import Presentation
-
-from pptx.util import Inches, Pt
-from pptx.dml.color import RGBColor
-from pptx.enum.text import PP_ALIGN
-from pptx.enum.dml import MSO_THEME_COLOR
-from pptx.enum.shapes import MSO_SHAPE
-from io import BytesIO
 
 # Custom modules
 from text_preprocessing.cleaner import clean_text
@@ -38,6 +30,19 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 GOOGLE_API_KEY2 = os.getenv("GOOGLE_API_KEY2")
 GOOGLE_CSE_ID = os.getenv("GOOGLE_CSE_ID")
 UNSPLASH_ACCESS_KEY = os.getenv("UNSPLASH_ACCESS_KEY")
+
+
+from langchain_core.embeddings import Embeddings
+
+
+class LocalEmbeddingAdapter(Embeddings):
+    """LangChain embedding adapter backed by the app's existing embedder."""
+
+    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+        return get_embeddings(texts).tolist()
+
+    def embed_query(self, text: str) -> List[float]:
+        return get_embeddings([text])[0].tolist()
 
 class DocumentSearchEngine:
     """
@@ -210,7 +215,145 @@ class DocumentSearchEngine:
             return response.json()
         except requests.exceptions.RequestException as e:
             return {"error": str(e)}
+
+    def run_xpoz_agent(self, query: str, context: str = "") -> str:
+        try:
+            xpoz_api_key = os.getenv("XPOZ_API_KEY")
+            if not xpoz_api_key:
+                return "<div class='social-post' style='border: 1px solid #FFCC00;'><div class='post-header'>⚠️ Xpoz Configuration Missing</div><div class='post-body'>Please add <b>XPOZ_API_KEY</b> to your backend <code>.env</code> file and restart the server to enable Social Media Exploration.</div></div>"
+            
+            mistral_api_key = os.getenv("MISTRAL_API_KEY")
+            if not mistral_api_key:
+                return "<div class='social-post' style='border: 1px solid #FFCC00;'><div class='post-header'>⚠️ Mistral Configuration Missing</div><div class='post-body'>Please add <b>MISTRAL_API_KEY</b> to your backend <code>.env</code> file.</div></div>"
+                
+            try:
+                from langchain_xpoz import XpozTwitterSearch, XpozInstagramSearch
+            except ImportError:
+                return "<div class='social-post' style='border: 1px solid #FF3333;'><div class='post-header'>❌ Missing Dependency</div><div class='post-body'>Please install langchain-xpoz (<code>pip install langchain-xpoz</code>).</div></div>"
+
+            from langchain_mistralai import ChatMistralAI
+            from langgraph.prebuilt import create_react_agent
+            from langchain_core.messages import SystemMessage
+            
+            model_name = os.getenv("MISTRAL_MODEL", "mistral-medium-3-5")
+            llm = ChatMistralAI(model=model_name, api_key=mistral_api_key, temperature=0.1)
+            
+            tools = [XpozTwitterSearch(), XpozInstagramSearch()]
+            
+            prompt_str = """You are a specialized social media researcher agent. Your goal is to fetch real posts from Twitter and Instagram that are relevant to the user's query and the provided context.
+
+You must output your final answer EXACTLY in this HTML format:
+
+## 🔍 Social Media Exploration for '[Your Extracted Search Term]'
+
+<div class='social-scroll-container'>
+  <div class='social-post twitter-post'><div class='post-header'>𝕏 @[author_username]</div><div class='post-body'>[Post content text]</div><a class='post-link' href='[url]' target='_blank'>View on X</a></div>
+  <div class='social-post ig-post'><div class='post-header'>📸 @[author_username]</div><div class='post-body'>[Post content text]</div><a class='post-link' href='[url]' target='_blank'>View on Instagram</a></div>
+</div>
+
+Rules:
+1. Use the provided tools to search for the most relevant posts based on the user's query.
+2. Always search multiple platforms. Give many posts from different platforms.
+3. For each post you find, create a corresponding `social-post` div inside the `social-scroll-container`.
+4. Only output valid HTML as specified above. Do not wrap it in markdown code blocks.
+5. If no posts are found at all, output: ## 🔍 Social Media Exploration\n\n*No relevant social media posts found.*
+"""
+            
+            agent = create_react_agent(llm, tools, prompt=SystemMessage(content=prompt_str))
+            
+            input_message = f"Context: {context[:500]}\n\nQuery: {query}"
+            result = agent.invoke({"messages": [("user", input_message)]})
+            
+            # The output is in the last message content
+            output = result["messages"][-1].content
+            
+            # Clean up potential markdown formatting from LLM
+            if output.startswith("```html"):
+                output = output.replace("```html", "", 1)
+            if output.endswith("```"):
+                output = output[::-1].replace("```", "", 1)[::-1]
+                
+            return output.strip()
+            
+        except BaseException as e:
+            return f"<div class='social-post' style='border: 1px solid #FF9900;'><div class='post-header'>⚠️ Social Media Unavailable</div><div class='post-body'>Could not fetch social media context at this time (Service error: {str(e)}).</div></div>"
     
+    def _build_document_chunks(self) -> List[Dict[str, Any]]:
+        chunks = []
+        for doc_index, doc in enumerate(self.documents):
+            sentences = sent_tokenize(doc.get("content", ""))
+            for chunk_index in range(0, len(sentences), 10):
+                chunk_text = " ".join(sentences[chunk_index:chunk_index + 10]).strip()
+                if not chunk_text:
+                    continue
+                chunks.append({
+                    "text": chunk_text,
+                    "doc_index": doc_index,
+                    "chunk_index": chunk_index // 10,
+                    "best_sentence": sentences[chunk_index] if sentences else "",
+                })
+        return chunks
+
+    def _mmr_chunk_search(self, query: str, threshold: float) -> List[Dict[str, Any]]:
+        try:
+            from langchain_core.documents import Document
+            try:
+                from langchain_community.vectorstores import FAISS
+            except ImportError:
+                from langchain.vectorstores import FAISS
+        except ImportError:
+            return []
+
+        chunks = self._build_document_chunks()
+        if not chunks:
+            return []
+
+        docs = [
+            Document(
+                page_content=chunk["text"],
+                metadata={
+                    "doc_index": chunk["doc_index"],
+                    "chunk_index": chunk["chunk_index"],
+                    "best_sentence": chunk["best_sentence"],
+                },
+            )
+            for chunk in chunks
+        ]
+        vectorstore = FAISS.from_documents(docs, LocalEmbeddingAdapter())
+        retriever = vectorstore.as_retriever(
+            search_type="mmr",
+            search_kwargs={
+                "k": min(5, len(docs)),
+                "fetch_k": min(20, len(docs)),
+                "lambda_mult": 0.5,
+            },
+        )
+        selected_docs = retriever.invoke(query)
+        query_embedding = get_embeddings([clean_text(query)])
+        results = []
+
+        for langchain_doc in selected_docs:
+            doc_index = int(langchain_doc.metadata["doc_index"])
+            doc = self.documents[doc_index]
+            chunk = langchain_doc.page_content
+            chunk_embedding = get_embeddings([chunk])
+            score = float(np.dot(
+                VectorSearchEngine._normalize(query_embedding),
+                VectorSearchEngine._normalize(chunk_embedding).T,
+            ).flatten()[0])
+            if score < threshold:
+                continue
+            results.append({
+                "doc": doc,
+                "best_sentence": langchain_doc.metadata.get("best_sentence", ""),
+                "score": score,
+                "relevant_chunk": chunk,
+                "summary": generate_answer_with_rag(query, chunk, doc["name"]),
+                "doc_index": doc_index,
+            })
+
+        return sorted(results, key=lambda x: x["score"], reverse=True)
+
     def find_relevant_documents(self, query: str, threshold: float = 0.35) -> List[Dict[str, Any]]:
         """
         Find documents relevant to the query
@@ -224,6 +367,10 @@ class DocumentSearchEngine:
         """
         if not self.documents or not self.doc_texts:
             return []
+
+        mmr_results = self._mmr_chunk_search(query, threshold)
+        if mmr_results:
+            return mmr_results
             
         clean_query = clean_text(query)
         query_embedding = get_embeddings([clean_query])
@@ -307,38 +454,61 @@ class DocumentSearchEngine:
     
     def search_action(self, query: str, threshold: float = 0.35) -> Dict[str, Any]:
         """
-        Perform search action - returns document summaries
+        Perform search action - uses LangChain MMR retriever on document chunks and returns relevant document chunks to the user.
         
         Args:
             query: Search query string
             threshold: Similarity threshold for relevance
             
         Returns:
-            Dictionary with search results and metadata
+            Dictionary with search results containing document chunks
         """
         relevant_results = self.find_relevant_documents(query, threshold)
         
         if not relevant_results:
             return {
                 "success": False,
-                "message": "No relevant documents found for your query.",
+                "message": "No relevant document chunks found for your query.",
                 "results": []
             }
+            
+        mistral_api_key = os.getenv("MISTRAL_API_KEY")
+        llm = None
+        if mistral_api_key:
+            try:
+                from langchain_core.messages import HumanMessage
+                from langchain_mistralai import ChatMistralAI
+                model_name = os.getenv("MISTRAL_MODEL", "mistral-medium-3-5")
+                llm = ChatMistralAI(model=model_name, api_key=mistral_api_key, temperature=0.3)
+            except Exception as e:
+                print(f"Failed to initialize Mistral LLM for search: {e}")
         
         search_results = []
         for result in relevant_results:
             doc = result["doc"]
+            chunk_text = result.get("relevant_chunk", result.get("summary", ""))
+            
+            summary = chunk_text
+            if llm:
+                try:
+                    prompt = f"Based on the following document excerpt, answer the query '{query}' in a well-decorated, formatted markdown style (use bolding, bullet points if helpful, and emojis). Keep it concise. Do not mention that this is an excerpt.\n\nExcerpt:\n{chunk_text}"
+                    response = llm.invoke([HumanMessage(content=prompt)])
+                    summary = response.content
+                except Exception as e:
+                    print(f"Mistral generation failed: {e}")
+            
             search_results.append({
                 "document_name": doc["name"],
                 "best_sentence": result["best_sentence"],
                 "score": result["score"],
-                "summary": result["summary"],
+                "summary": summary,
+                "relevant_chunk": chunk_text,
                 "action_type": "search"
             })
         
         return {
             "success": True,
-            "message": f"Found {len(search_results)} relevant documents",
+            "message": f"Found {len(search_results)} relevant document chunks",
             "results": search_results,
             "action": "search"
         }
@@ -369,8 +539,7 @@ class DocumentSearchEngine:
             summary = result["summary"]
             
             try:
-                search_tool = GoogleSearchTool(api_key=GOOGLE_API_KEY2, cse_id=GOOGLE_CSE_ID)
-                web_content = search_tool.run(query, context=summary[:250])
+                web_content = self.run_xpoz_agent(query, context=summary[:250])
                 
                 explore_results.append({
                     "document_name": doc["name"],
@@ -422,8 +591,13 @@ class DocumentSearchEngine:
             raw_chunk = result["relevant_chunk"]
             
             try:
-                from rag.Google_Gen_AI import generate_answer_with_google
-                refined_answer = generate_answer_with_google(query, raw_chunk, doc["name"], action_type="think")
+                from think.pipeline import run_research_pipeline
+                topic = f"{query}\n\nRelevant document context from {doc['name']}:\n{raw_chunk[:1500]}"
+                state = run_research_pipeline(topic)
+                refined_answer = (
+                    f"{state.get('report', '')}\n\n"
+                    f"Critic review:\n{state.get('feedback', '')}"
+                ).strip()
                 
                 think_results.append({
                     "document_name": doc["name"],
@@ -437,7 +611,7 @@ class DocumentSearchEngine:
                     "document_name": doc["name"],
                     "best_sentence": result["best_sentence"],
                     "score": result["score"],
-                    "refined_insight": f"Error during insight generation: {str(e)}",
+                    "refined_insight": f"Error during think pipeline: {str(e)}",
                     "action_type": "think",
                     "error": True
                 })
@@ -455,7 +629,7 @@ class DocumentSearchEngine:
         
         Args:
             query: Search query string
-            action: Action type ("search", "explore", "think", "ppt")
+            action: Action type ("search", "explore", "think")
             threshold: Similarity threshold for document relevance
             
         Returns:
@@ -476,418 +650,10 @@ class DocumentSearchEngine:
             return self.explore_action(query, threshold)
         elif action == "think":
             return self.think_action(query, threshold)
-        elif action == "ppt":
-            return self.generate_ppt_action(query, threshold)
         else:
             return {
                 "success": False,
-                "message": f"Unknown action: {action}. Available actions: search, explore, think, ppt",
-                "results": []
-            }
-
-    def _slugify_filename(self, text: str) -> str:
-        """Create a filesystem-safe slug for filenames"""
-        import re
-        slug = re.sub(r"[^a-zA-Z0-9\-_. ]+", "", text).strip().replace(" ", "_")
-        if not slug:
-            slug = "presentation"
-        return slug[:60]
-
-    def _create_decorative_presentation(self, title: str, summary: str) -> str:
-        """
-        Create a decorative PPTX file from title and summary.
-
-        Returns the absolute file path to the generated PPTX.
-        """
-        # Create presentation with a widescreen layout
-        prs = Presentation()
-
-        # Simple brand palette
-        primary = RGBColor(30, 144, 255)      # DodgerBlue
-        secondary = RGBColor(230, 245, 255)   # Light Blue BG
-        accent = RGBColor(76, 175, 80)        # Green
-
-        # Title slide
-        title_slide_layout = prs.slide_layouts[0]
-        slide = prs.slides.add_slide(title_slide_layout)
-        slide.shapes.title.text = title
-        subtitle = slide.placeholders[1]
-        subtitle.text = f"Auto-generated on {datetime.now().strftime('%Y-%m-%d %H:%M')}"
-        # Style title
-        title_tf = slide.shapes.title.text_frame
-        title_tf.paragraphs[0].font.size = Pt(44)
-        title_tf.paragraphs[0].font.bold = True
-
-        # Summary bullets slide
-        bullet_layout = prs.slide_layouts[1]
-        slide2 = prs.slides.add_slide(bullet_layout)
-        slide2.shapes.title.text = "Executive Summary"
-        body = slide2.shapes.placeholders[1]
-        tf = body.text_frame
-        tf.clear()
-        # Split summary into bullet points by sentences/newlines
-        points = [p.strip() for p in summary.replace("\n", " ").split('.') if p.strip()]
-        if not points:
-            points = [summary]
-        for i, point in enumerate(points[:8]):
-            if i == 0:
-                p = tf.paragraphs[0]
-            else:
-                p = tf.add_paragraph()
-            p.text = point
-            p.level = 0
-        # Add a decorative band under the title
-        band_shape = slide2.shapes.add_shape(
-            MSO_SHAPE.RECTANGLE,
-            Inches(0.5), Inches(1.7), Inches(9.0), Inches(0.15)
-        )
-        band_fill = band_shape.fill
-        band_fill.solid()
-        band_fill.fore_color.rgb = primary
-
-        # Decorative content slides for first few points
-        # Fetch 1 hero image once and reuse (speed optimization)
-        hero_image = self._fetch_image_bytes(f"{title} concept illustration")
-
-        for idx, point in enumerate(points[:5], start=1):
-            content_layout = prs.slide_layouts[5]  # Title Only
-            s = prs.slides.add_slide(content_layout)
-            s.shapes.title.text = f"Key Point {idx}"
-            # Add a rounded rectangle with the point text
-            left = Inches(1)
-            top = Inches(2)
-            width = Inches(8)
-            height = Inches(2)
-            shape = s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, left, top, width, height)
-            fill = shape.fill
-            fill.solid()
-            fill.fore_color.rgb = secondary
-            line = shape.line
-            line.color.rgb = primary
-            text_frame = shape.text_frame
-            text_frame.text = point
-            for para in text_frame.paragraphs:
-                para.font.size = Pt(20)
-
-            # Add a small decorative circle as an icon
-            circle = s.shapes.add_shape(MSO_SHAPE.OVAL, Inches(0.6), Inches(1.8), Inches(0.6), Inches(0.6))
-            circle.fill.solid()
-            circle.fill.fore_color.rgb = primary
-            circle.line.color.rgb = primary
-
-            # Try to add a relevant image on the right
-            image_bytes = hero_image  # reuse hero image for speed
-            if image_bytes is not None:
-                try:
-                    pic_left = Inches(6.8)
-                    pic_top = Inches(1.8)
-                    pic_width = Inches(2.2)
-                    s.shapes.add_picture(BytesIO(image_bytes), pic_left, pic_top, width=pic_width)
-                except Exception:
-                    # Ignore image placement errors
-                    pass
-
-        # Ensure output directory exists
-        out_dir = os.path.join(os.getcwd(), "generated")
-        os.makedirs(out_dir, exist_ok=True)
-        file_name = f"{self._slugify_filename(title)}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pptx"
-        file_path = os.path.join(out_dir, file_name)
-        prs.save(file_path)
-        return file_path
-
-    def _fetch_image_bytes(self, query: str) -> Any:
-        """
-        Fetch a relevant image for the query from Unsplash. Returns bytes or None.
-        """
-        try:
-            if not UNSPLASH_ACCESS_KEY:
-                return None
-            url = "https://api.unsplash.com/search/photos"
-            params = {
-                "query": query,
-                "per_page": 1,
-                "orientation": "landscape"
-            }
-            headers = {"Authorization": f"Client-ID {UNSPLASH_ACCESS_KEY}"}
-            resp = requests.get(url, params=params, headers=headers, timeout=3)
-            resp.raise_for_status()
-            data = resp.json()
-            if not data.get("results"):
-                return None
-            img_url = data["results"][0]["urls"].get("regular") or data["results"][0]["urls"].get("small")
-            if not img_url:
-                return None
-            img_resp = requests.get(img_url, timeout=3)
-            img_resp.raise_for_status()
-            return img_resp.content
-        except Exception:
-            return None
-
-    def _generate_ppt_outline(self, query: str, summary: str) -> Dict[str, Any]:
-        """
-        Use Google Gen AI to turn the summary into a clean outline for PPT creation.
-        Returns a dict with structure: { title, agenda[], sections:[{heading, bullets[], image_keywords[]}], conclusion[] }
-        Falls back to a heuristic outline if the AI call fails.
-        """
-        # Default heuristic
-        def heuristic_outline() -> Dict[str, Any]:
-            sentences = [s.strip() for s in summary.replace("\n", " ").split('.') if s.strip()] or [summary]
-            top_points = sentences[:6]
-            sections = []
-            for idx, chunk in enumerate([top_points[:2], top_points[2:4], top_points[4:6]]):
-                if not chunk:
-                    continue
-                sections.append({
-                    "heading": f"Section {idx+1}",
-                    "bullets": chunk,
-                    "image_keywords": [query]
-                })
-            return {
-                "title": query,
-                "agenda": [s[:90] for s in top_points[:4]],
-                "sections": sections,
-                "conclusion": ["Key takeaways:"] + [s[:100] for s in top_points[:2]]
-            }
-
-        try:
-            from rag.Google_Gen_AI import generate_answer_with_google
-            prompt = (
-                "You are a presentation assistant. Given a topic and context summary,"
-                " produce a concise JSON for slides with keys: title (string), agenda (array of 3-5 short items),"
-                " sections (array of 2-4 objects each with: heading (string), bullets (array of 3-5 short items),"
-                " image_keywords (array of 1-3 short keywords)), conclusion (array of 2-4 short items)."
-                " Keep text concise, no markdown or extra commentary."
-                f"\nTopic: {query}\nContext: {summary}"
-            )
-            raw = generate_answer_with_google("Create PPT outline JSON", prompt, "ppt-outline")
-            import json
-            # Try to extract JSON from raw
-            start = raw.find('{')
-            end = raw.rfind('}')
-            obj = json.loads(raw[start:end+1]) if start != -1 and end != -1 else json.loads(raw)
-            # Validate minimal structure
-            if not isinstance(obj, dict) or "title" not in obj:
-                return heuristic_outline()
-            obj.setdefault("agenda", [])
-            obj.setdefault("sections", [])
-            obj.setdefault("conclusion", [])
-            return obj
-        except Exception:
-            return heuristic_outline()
-
-    def _create_presentation_from_outline(self, outline: Dict[str, Any]) -> str:
-        """Create a polished PPTX using a structured outline."""
-        prs = Presentation()
-
-        primary = RGBColor(30, 144, 255)
-        secondary = RGBColor(230, 245, 255)
-        dark = RGBColor(33, 33, 33)
-
-        # Title slide
-        title_slide_layout = prs.slide_layouts[0]
-        slide = prs.slides.add_slide(title_slide_layout)
-        slide.shapes.title.text = outline.get("title") or "Presentation"
-        # Improve title visibility
-        try:
-            title_tf = slide.shapes.title.text_frame
-            if title_tf.paragraphs:
-                title_tf.paragraphs[0].font.bold = True
-                title_tf.paragraphs[0].font.size = Pt(44)
-                title_tf.paragraphs[0].font.color.rgb = dark
-        except Exception:
-            pass
-        subtitle = slide.placeholders[1]
-        subtitle.text = "Auto-generated deck"
-        try:
-            sub_tf = subtitle.text_frame
-            if sub_tf.paragraphs:
-                sub_tf.paragraphs[0].font.color.rgb = dark
-                sub_tf.paragraphs[0].font.size = Pt(18)
-        except Exception:
-            pass
-        # Decorative band
-        band = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0), Inches(5), Inches(10), Inches(0.4))
-        band.fill.solid()
-        band.fill.fore_color.rgb = primary
-
-        # Agenda slide
-        if outline.get("agenda"):
-            layout = prs.slide_layouts[1]
-            s2 = prs.slides.add_slide(layout)
-            s2.shapes.title.text = "Agenda"
-            try:
-                if s2.shapes.title.text_frame.paragraphs:
-                    s2.shapes.title.text_frame.paragraphs[0].font.color.rgb = dark
-                    s2.shapes.title.text_frame.paragraphs[0].font.bold = True
-            except Exception:
-                pass
-            body = s2.shapes.placeholders[1]
-            tf = body.text_frame
-            tf.clear()
-            for i, item in enumerate(outline["agenda"][:6]):
-                p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
-                p.text = str(item)
-                p.level = 0
-                try:
-                    p.font.color.rgb = dark
-                    p.font.size = Pt(18)
-                except Exception:
-                    pass
-            # band
-            band2 = s2.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0.5), Inches(1.7), Inches(9.0), Inches(0.15))
-            band2.fill.solid()
-            band2.fill.fore_color.rgb = primary
-
-        # Prepare hero image once for speed
-        hero_image = None
-        # Try to derive a topic keyword
-        topic_kw = outline.get("title") or ""
-        hero_image = self._fetch_image_bytes(f"{topic_kw} concept illustration")
-
-        # Section slides
-        for section in outline.get("sections", [])[:4]:
-            layout = prs.slide_layouts[5]  # Title Only
-            s = prs.slides.add_slide(layout)
-            s.shapes.title.text = section.get("heading") or "Section"
-            try:
-                if s.shapes.title.text_frame.paragraphs:
-                    s.shapes.title.text_frame.paragraphs[0].font.color.rgb = dark
-                    s.shapes.title.text_frame.paragraphs[0].font.bold = True
-            except Exception:
-                pass
-
-            # Text container
-            left = Inches(0.8)
-            top = Inches(1.6)
-            width = Inches(5.8)
-            height = Inches(3.6)
-            rect = s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, left, top, width, height)
-            rect.fill.solid()
-            rect.fill.fore_color.rgb = secondary
-            rect.line.color.rgb = primary
-            tf = rect.text_frame
-            tf.clear()
-            bullets = section.get("bullets", [])
-            for i, b in enumerate(bullets[:6]):
-                p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
-                p.text = str(b)
-                p.level = 0
-                try:
-                    p.font.color.rgb = dark
-                    p.font.size = Pt(18)
-                except Exception:
-                    pass
-
-            # Images: try 1-2 images; reuse hero if available; otherwise fetch using keywords
-            images_added = 0
-            img_left = Inches(6.8)
-            img_top = Inches(1.4)
-            img_width = Inches(2.2)
-
-            if hero_image is not None:
-                try:
-                    s.shapes.add_picture(BytesIO(hero_image), img_left, img_top, width=img_width)
-                    images_added += 1
-                except Exception:
-                    pass
-
-            if images_added < 2:
-                kw_list = section.get("image_keywords") or [topic_kw]
-                for kw in kw_list:
-                    img = self._fetch_image_bytes(str(kw))
-                    if img is not None:
-                        try:
-                            s.shapes.add_picture(BytesIO(img), img_left, img_top + Inches(2.4 * images_added), width=img_width)
-                            images_added += 1
-                            if images_added >= 2:
-                                break
-                        except Exception:
-                            continue
-
-            # Decorative icon
-            icon = s.shapes.add_shape(MSO_SHAPE.OVAL, Inches(0.4), Inches(1.2), Inches(0.5), Inches(0.5))
-            icon.fill.solid()
-            icon.fill.fore_color.rgb = primary
-            icon.line.color.rgb = primary
-
-        # Conclusion slide
-        if outline.get("conclusion"):
-            layout = prs.slide_layouts[1]
-            sc = prs.slides.add_slide(layout)
-            sc.shapes.title.text = "Conclusion"
-            try:
-                if sc.shapes.title.text_frame.paragraphs:
-                    sc.shapes.title.text_frame.paragraphs[0].font.color.rgb = dark
-                    sc.shapes.title.text_frame.paragraphs[0].font.bold = True
-            except Exception:
-                pass
-            body = sc.shapes.placeholders[1]
-            tf = body.text_frame
-            tf.clear()
-            for i, item in enumerate(outline["conclusion"][:6]):
-                p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
-                p.text = str(item)
-                p.level = 0
-                try:
-                    p.font.color.rgb = dark
-                    p.font.size = Pt(18)
-                except Exception:
-                    pass
-            band3 = sc.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0.5), Inches(1.7), Inches(9.0), Inches(0.15))
-            band3.fill.solid()
-            band3.fill.fore_color.rgb = primary
-
-        out_dir = os.path.join(os.getcwd(), "generated")
-        os.makedirs(out_dir, exist_ok=True)
-        file_name = f"{self._slugify_filename(outline.get('title') or 'presentation')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pptx"
-        file_path = os.path.join(out_dir, file_name)
-        prs.save(file_path)
-        return file_path
-
-    def generate_ppt_action(self, query: str, threshold: float = 0.75) -> Dict[str, Any]:
-        """
-        Generate a decorative PPT using the best RAG summary for the query.
-
-        Args:
-            query: Search query string
-            threshold: Similarity threshold for relevance
-
-        Returns a dict containing path and metadata of the generated PPT.
-        """
-        relevant_results = self.find_relevant_documents(query, threshold)
-
-        if not relevant_results:
-            return {
-                "success": False,
-                "message": "No relevant documents found for your query.",
-                "results": []
-            }
-
-        # Use the top result's summary to build the deck
-        top = relevant_results[0]
-        doc = top["doc"]
-        summary = top["summary"]
-
-        try:
-            # Generate structured outline first for better quality content
-            outline = self._generate_ppt_outline(query=query, summary=summary)
-            ppt_path = self._create_presentation_from_outline(outline)
-            return {
-                "success": True,
-                "message": f"PPT generated successfully from document: {doc['name']}",
-                "results": [{
-                    "document_name": doc["name"],
-                    "score": top["score"],
-                    "ppt_path": ppt_path,
-                    "file_name": os.path.basename(ppt_path),
-                    "action_type": "ppt"
-                }],
-                "action": "ppt"
-            }
-        except Exception as e:
-            return {
-                "success": False,
-                "message": f"Failed to generate PPT: {str(e)}",
+                "message": f"Unknown action: {action}. Available actions: search, explore, think",
                 "results": []
             }
     

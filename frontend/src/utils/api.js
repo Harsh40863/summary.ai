@@ -1,11 +1,9 @@
 import axios from 'axios';
 
-// Call Railway DIRECTLY — bypasses Vercel's 30s proxy timeout
-// Railway URL is not secret since we use JWT Bearer tokens for security
-const RAILWAY_URL = 'https://summaryai-production-bc85.up.railway.app';
+const API_BASE_URL = import.meta.env.VITE_API_URL || (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? 'http://localhost:8000' : 'https://summaryai-production-bc85.up.railway.app');
 
 const api = axios.create({
-  baseURL: RAILWAY_URL,
+  baseURL: API_BASE_URL,
   timeout: 120000, // 2 minute timeout — ML operations (search/think) can take time
 });
 
@@ -42,10 +40,10 @@ let keepAliveInterval = null;
 export function startKeepAlive() {
   if (keepAliveInterval) return; // already running
   // Ping immediately
-  axios.get(`${RAILWAY_URL}/ping`).catch(() => {});
+  axios.get(`${API_BASE_URL}/ping`).catch(() => {});
   // Then every 4 minutes
   keepAliveInterval = setInterval(() => {
-    axios.get(`${RAILWAY_URL}/ping`).catch(() => {});
+    axios.get(`${API_BASE_URL}/ping`).catch(() => {});
   }, 4 * 60 * 1000);
 }
 

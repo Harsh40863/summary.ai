@@ -1,3 +1,4 @@
+import os
 import numpy as np
 from PIL import Image
 
@@ -8,6 +9,9 @@ _clip_model = None
 def _get_text_model():
     global _text_model
     if _text_model is None:
+        if os.getenv("ENABLE_SENTENCE_TRANSFORMERS", "false").lower() != "true":
+            _text_model = "fallback"
+            return _text_model
         try:
             from sentence_transformers import SentenceTransformer
             _text_model = SentenceTransformer("all-MiniLM-L6-v2")
@@ -79,4 +83,3 @@ def get_embeddings(data, type: str = "text"):
 
     else:
         raise ValueError("type must be 'text' or 'image'")
-

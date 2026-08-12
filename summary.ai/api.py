@@ -3,7 +3,7 @@
 # ---------------------------
 from fastapi import FastAPI, File, UploadFile, HTTPException, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
 import logging
@@ -14,9 +14,10 @@ import sys
 
 # Ensure root directory is in python path so 'backend.logic' can be found
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), 'backend')))
 
 # Import the logic module
-from backend.logic import get_search_engine, reset_search_engine, DocumentSearchEngine
+from logic import get_search_engine, reset_search_engine, DocumentSearchEngine
 
 # Import translation functions
 from translation.redis_translator import translate_response, get_supported_languages, is_supported_language
@@ -54,7 +55,7 @@ app.add_middleware(
 # ---------------------------
 class QueryRequest(BaseModel):
     query: str = Field(..., min_length=1, description="Search query string")
-    action: str = Field(..., description="Action type: search, explore, think, or ppt")
+    action: str = Field(..., description="Action type: search, explore, or think")
     threshold: Optional[float] = Field(0.35, description="Similarity threshold for relevance")
     translate_to: Optional[str] = Field('en', description="Target language (en, hi, fr, es, de, ja, ko, zh) - Only for search and think actions")
 
@@ -228,7 +229,7 @@ async def process_query(
     """Process a search query with specified action and optional translation"""
     try:
         # Validate action
-        valid_actions = ['search', 'explore', 'think', 'ppt']
+        valid_actions = ['search', 'explore', 'think']
         if request.action.lower() not in valid_actions:
             raise HTTPException(
                 status_code=400, 
@@ -364,16 +365,6 @@ async def think_documents(
     request.action = "think"
     return await process_query(request, engine)
 
-@app.post("/ppt", response_model=QueryResponse)
-async def generate_ppt(
-    request: QueryRequest,
-    engine: DocumentSearchEngine = Depends(get_engine)
-):
-    """Generate a decorative PPT from query summary (no translation)."""
-    request.action = "ppt"
-    # Translation not applicable for PPT generation
-    return await process_query(request, engine)
-
 @app.get("/search", response_model=QueryResponse)
 async def search_documents_get(
     q: str = Query(..., description="Search query"),
@@ -402,28 +393,6 @@ async def think_documents_get(
 ):
     """Think about documents via GET request with translation"""
     return await process_query_get(q, "think", threshold, translate_to, engine)
-
-@app.get("/ppt", response_model=QueryResponse)
-async def generate_ppt_get(
-    q: str = Query(..., description="Search query"),
-    threshold: float = Query(0.35, description="Similarity threshold"),
-    engine: DocumentSearchEngine = Depends(get_engine)
-):
-    """Generate PPT via GET request (returns metadata incl. file path)."""
-    return await process_query_get(q, "ppt", threshold, 'en', engine)
-
-@app.get("/ppt/download")
-async def download_ppt(path: str = Query(..., description="Absolute path returned by /ppt")):
-    """Download a previously generated PPTX by providing its absolute path."""
-    try:
-        if not os.path.isfile(path):
-            raise HTTPException(status_code=404, detail="File not found")
-        filename = os.path.basename(path)
-        return FileResponse(path, media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation", filename=filename)
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to download file: {str(e)}")
 
 @app.delete("/reset")
 async def reset_system():
