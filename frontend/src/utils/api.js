@@ -5,6 +5,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || (typeof window !== 'undefin
 const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 120000, // 2 minute timeout — ML operations (search/think) can take time
+  withCredentials: true,
 });
 
 api.interceptors.request.use((config) => {

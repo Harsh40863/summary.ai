@@ -29,12 +29,16 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 # This middleware runs BEFORE any route handler so even crash responses get headers
 class ForceCORSMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
+        origin = request.headers.get("origin")
+        allow_origin = origin if origin else "*"
+        
         # Handle preflight OPTIONS immediately
         if request.method == "OPTIONS":
             response = JSONResponse(content={}, status_code=200)
-            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Origin"] = allow_origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
             response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
-            response.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type, Accept"
+            response.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type, Accept, Cookie"
             response.headers["Access-Control-Max-Age"] = "86400"
             return response
 
@@ -47,9 +51,10 @@ class ForceCORSMiddleware(BaseHTTPMiddleware):
             )
 
         # Always inject CORS headers
-        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Origin"] = allow_origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
         response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
-        response.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type, Accept"
+        response.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type, Accept, Cookie"
         return response
 
 # Add force-CORS middleware FIRST (outermost layer)
@@ -58,8 +63,8 @@ app.add_middleware(ForceCORSMiddleware)
 # Standard CORS middleware as backup
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
+    allow_origin_regex="http://localhost:.*",
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )

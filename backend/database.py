@@ -19,3 +19,10 @@ client = MongoClient(MONGODB_URI)
 db = client.hackindia
 users_collection = db.users
 sessions_collection = db.sessions
+blacklist_collection = db.blacklist_tokens
+
+try:
+    blacklist_collection.create_index("expire_at", expireAfterSeconds=0)
+except Exception as e:
+    print(f"Warning: Failed to create TTL index on blacklist_tokens: {e}")
+

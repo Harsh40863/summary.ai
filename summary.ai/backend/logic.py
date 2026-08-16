@@ -218,46 +218,53 @@ class DocumentSearchEngine:
 
     def run_xpoz_agent(self, query: str, context: str = "") -> str:
         try:
-            xpoz_api_key = os.getenv("XPOZ_API_KEY")
-            if not xpoz_api_key:
-                return "<div class='social-post' style='border: 1px solid #FFCC00;'><div class='post-header'>⚠️ Xpoz Configuration Missing</div><div class='post-body'>Please add <b>XPOZ_API_KEY</b> to your backend <code>.env</code> file and restart the server to enable Social Media Exploration.</div></div>"
+            tavily_api_key = os.getenv("TAVILY_API_KEY")
+            if not tavily_api_key:
+                return "<div class='social-post' style='border: 1px solid #FFCC00;'><div class='post-header'>⚠️ Tavily Configuration Missing</div><div class='post-body'>Please add <b>TAVILY_API_KEY</b> to your backend <code>.env</code> file.</div></div>"
             
             mistral_api_key = os.getenv("MISTRAL_API_KEY")
             if not mistral_api_key:
                 return "<div class='social-post' style='border: 1px solid #FFCC00;'><div class='post-header'>⚠️ Mistral Configuration Missing</div><div class='post-body'>Please add <b>MISTRAL_API_KEY</b> to your backend <code>.env</code> file.</div></div>"
-                
-            try:
-                from langchain_xpoz import XpozTwitterSearch, XpozInstagramSearch
-            except ImportError:
-                return "<div class='social-post' style='border: 1px solid #FF3333;'><div class='post-header'>❌ Missing Dependency</div><div class='post-body'>Please install langchain-xpoz (<code>pip install langchain-xpoz</code>).</div></div>"
 
             from langchain_mistralai import ChatMistralAI
             from langgraph.prebuilt import create_react_agent
             from langchain_core.messages import SystemMessage
+            from langchain_core.tools import tool
+            from tavily import TavilyClient
             
             model_name = os.getenv("MISTRAL_MODEL", "mistral-medium-3-5")
             llm = ChatMistralAI(model=model_name, api_key=mistral_api_key, temperature=0.1)
             
-            tools = [XpozTwitterSearch(), XpozInstagramSearch()]
+            @tool
+            def web_search(search_query: str) -> str:
+                """Search the web for recent and reliable information."""
+                tavily = TavilyClient(api_key=tavily_api_key)
+                results = tavily.search(query=search_query, max_results=5)
+                out = []
+                for r in results.get('results', []):
+                    out.append(f"Title: {r['title']}\nURL: {r['url']}\nSnippet: {r['content']}\n")
+                return "\n----\n".join(out)
+
+            tools = [web_search]
             
-            prompt_str = """You are a specialized social media researcher agent. Your goal is to fetch real posts from Twitter and Instagram that are relevant to the user's query and the provided context.
-
-You must output your final answer EXACTLY in this HTML format:
-
-## 🔍 Social Media Exploration for '[Your Extracted Search Term]'
-
-<div class='social-scroll-container'>
-  <div class='social-post twitter-post'><div class='post-header'>𝕏 @[author_username]</div><div class='post-body'>[Post content text]</div><a class='post-link' href='[url]' target='_blank'>View on X</a></div>
-  <div class='social-post ig-post'><div class='post-header'>📸 @[author_username]</div><div class='post-body'>[Post content text]</div><a class='post-link' href='[url]' target='_blank'>View on Instagram</a></div>
-</div>
-
-Rules:
-1. Use the provided tools to search for the most relevant posts based on the user's query.
-2. Always search multiple platforms. Give many posts from different platforms.
-3. For each post you find, create a corresponding `social-post` div inside the `social-scroll-container`.
-4. Only output valid HTML as specified above. Do not wrap it in markdown code blocks.
-5. If no posts are found at all, output: ## 🔍 Social Media Exploration\n\n*No relevant social media posts found.*
-"""
+            prompt_str = """You are a specialized research assistant agent. Your goal is to search the web for real information relevant to the user's query and the provided context.
+            
+            You must output your final answer EXACTLY in this HTML format:
+            
+            ## 🔍 Web Exploration for '[Your Extracted Search Term]'
+            
+            <div class='social-scroll-container'>
+              <div class='social-post' style='border: 1px solid #00D2FF;'><div class='post-header'>🌐 [Domain Name / Source] - [Title]</div><div class='post-body'>[Content summary / Snippet]</div><a class='post-link' href='[url]' target='_blank'>Read Article</a></div>
+              ...
+            </div>
+            
+            Rules:
+            1. Use the web_search tool to find the most relevant web pages based on the user's query.
+            2. For each search result you select, create a corresponding `social-post` div inside the `social-scroll-container`.
+            3. Make sure the HTML format is exactly as specified. Do not wrap it in markdown code blocks.
+            4. Keep the HTML clean, and always provide direct links to the articles.
+            5. If no information is found at all, output: ## 🔍 Web Exploration\n\n*No relevant information found.*
+            """
             
             agent = create_react_agent(llm, tools, prompt=SystemMessage(content=prompt_str))
             
@@ -276,7 +283,9 @@ Rules:
             return output.strip()
             
         except BaseException as e:
-            return f"<div class='social-post' style='border: 1px solid #FF9900;'><div class='post-header'>⚠️ Social Media Unavailable</div><div class='post-body'>Could not fetch social media context at this time (Service error: {str(e)}).</div></div>"
+            import traceback
+            traceback.print_exc()
+            return f"<div class='social-post' style='border: 1px solid #FF9900;'><div class='post-header'>⚠️ Exploration Unavailable</div><div class='post-body'>Could not fetch web context at this time (Service error: {str(e)}).</div></div>"
     
     def _build_document_chunks(self) -> List[Dict[str, Any]]:
         chunks = []

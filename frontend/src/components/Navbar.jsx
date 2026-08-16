@@ -1,11 +1,17 @@
 import { Link, useNavigate } from 'react-router-dom';
+import api from '../utils/api';
 
 const Navbar = ({ isLoggedIn }) => {
   const navigate = useNavigate();
   const token = localStorage.getItem('hackindia_token');
   const isAuth = isLoggedIn || !!token;
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await api.post('/auth/logout');
+    } catch (err) {
+      console.error("Logout request failed:", err);
+    }
     localStorage.removeItem('hackindia_token');
     navigate('/');
   };
