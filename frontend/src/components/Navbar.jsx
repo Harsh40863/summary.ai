@@ -1,18 +1,14 @@
+import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import api from '../utils/api';
+import useAuth from '../hooks/useAuth';
 
 const Navbar = ({ isLoggedIn }) => {
   const navigate = useNavigate();
-  const token = localStorage.getItem('hackindia_token');
-  const isAuth = isLoggedIn || !!token;
+  const { isAuthenticated, logout } = useAuth();
+  const isAuth = isLoggedIn || isAuthenticated;
 
   const handleLogout = async () => {
-    try {
-      await api.post('/auth/logout');
-    } catch (err) {
-      console.error("Logout request failed:", err);
-    }
-    localStorage.removeItem('hackindia_token');
+    await logout();
     navigate('/');
   };
 
@@ -43,9 +39,19 @@ const Navbar = ({ isLoggedIn }) => {
         ) : (
           <>
             <Link to="/dashboard" style={{ color: 'white', marginRight: '20px', textDecoration: 'none' }}>Dashboard</Link>
-            <button onClick={handleLogout} style={{
-              background: 'transparent', border: 'none', color: 'white', cursor: 'pointer', fontFamily: "'Space Grotesk', sans-serif", fontSize: '16px'
-            }}>Logout</button>
+            <button
+              onClick={handleLogout}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: 'white',
+                cursor: 'pointer',
+                fontFamily: "'Space Grotesk', sans-serif",
+                fontSize: '16px'
+              }}
+            >
+              Logout
+            </button>
           </>
         )}
       </div>
@@ -53,4 +59,4 @@ const Navbar = ({ isLoggedIn }) => {
   );
 };
 
-export default Navbar;
+export default React.memo(Navbar);

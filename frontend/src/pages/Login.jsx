@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import api from '../utils/api';
+import useAuth from '../hooks/useAuth';
 import '../styles/auth.css';
 
 const Login = () => {
@@ -9,6 +9,7 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const { login } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -16,11 +17,10 @@ const Login = () => {
     setLoading(true);
     setError('');
     try {
-      const response = await api.post('/auth/login', { email, password });
-      localStorage.setItem('hackindia_token', response.data.access_token);
+      await login(email, password);
       navigate('/dashboard');
     } catch (err) {
-      setError(err.response?.data?.detail || 'Login failed');
+      setError(err.response?.data?.detail || 'Login failed. Please check your credentials.');
     } finally {
       setLoading(false);
     }
@@ -41,6 +41,8 @@ const Login = () => {
         loop
         muted
         playsInline
+        preload="metadata"
+        onError={(e) => { e.currentTarget.style.display = 'none'; }}
       />
       <div className="auth-video-overlay" />
       <div className="auth-card">
@@ -49,23 +51,51 @@ const Login = () => {
         </div>
         <h1 className="auth-title">Welcome back</h1>
         <p className="auth-subtitle">Sign in to your HackIndia account</p>
-        
+
         <form onSubmit={handleSubmit} className="auth-form">
           <div className="input-group">
-            <svg className="input-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
-            <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} required />
+            <svg
+              className="input-icon"
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+              <polyline points="22,6 12,13 2,6"></polyline>
+            </svg>
+            <input
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
           </div>
           <div className="input-group">
-            <input type={showPassword ? "text" : "password"} placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} required />
-            <button type="button" className="eye-toggle" onClick={() => setShowPassword(!showPassword)}>
-              {showPassword ? "Hide" : "Show"}
+            <input
+              type={showPassword ? 'text' : 'password'}
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+            <button
+              type="button"
+              className="eye-toggle"
+              onClick={() => setShowPassword(!showPassword)}
+            >
+              {showPassword ? 'Hide' : 'Show'}
             </button>
           </div>
           <div className="forgot-password">
             <a href="#">Forgot password?</a>
           </div>
           <button type="submit" className="auth-btn" disabled={loading}>
-            {loading ? <div className="spinner"></div> : "Sign In"}
+            {loading ? <div className="spinner"></div> : 'Sign In'}
           </button>
           {error && <div className="auth-error">{error}</div>}
         </form>

@@ -1,3 +1,4 @@
+import React from 'react';
 import { Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import '../styles/home.css';
@@ -18,6 +19,8 @@ const Home = () => {
         loop
         muted
         playsInline
+        preload="metadata"
+        onError={(e) => { e.currentTarget.style.display = 'none'; }}
       />
       <div className="video-overlay" />
       <Navbar />
@@ -38,4 +41,4 @@ const Home = () => {
   );
 };
 
-export default Home;
+export default React.memo(Home);

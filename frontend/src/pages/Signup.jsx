@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import api from '../utils/api';
+import useAuth from '../hooks/useAuth';
 import '../styles/auth.css';
 
 const Signup = () => {
@@ -11,6 +11,7 @@ const Signup = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const { signup } = useAuth();
   const navigate = useNavigate();
 
   const getPasswordStrength = (pwd) => {
@@ -31,7 +32,7 @@ const Signup = () => {
     setLoading(true);
     setError('');
     try {
-      await api.post('/auth/signup', { name, email, password });
+      await signup(name, email, password);
       navigate('/login');
     } catch (err) {
       const detailMsg = err.response?.data?.detail;
@@ -62,6 +63,8 @@ const Signup = () => {
         loop
         muted
         playsInline
+        preload="metadata"
+        onError={(e) => { e.currentTarget.style.display = 'none'; }}
       />
       <div className="auth-video-overlay" />
       <div className="auth-card">
@@ -70,32 +73,65 @@ const Signup = () => {
         </div>
         <h1 className="auth-title">Join HackIndia</h1>
         <p className="auth-subtitle">Create your account and start building</p>
-        
+
         <form onSubmit={handleSubmit} className="auth-form">
           <div className="input-group">
-            <input type="text" placeholder="Full Name" value={name} onChange={e => setName(e.target.value)} required />
+            <input
+              type="text"
+              placeholder="Full Name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+            />
           </div>
           <div className="input-group">
-            <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} required />
+            <input
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
           </div>
           <div className="input-group">
-            <input type={showPassword ? "text" : "password"} placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} required />
-            <button type="button" className="eye-toggle" onClick={() => setShowPassword(!showPassword)}>
-              {showPassword ? "Hide" : "Show"}
+            <input
+              type={showPassword ? 'text' : 'password'}
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+            <button
+              type="button"
+              className="eye-toggle"
+              onClick={() => setShowPassword(!showPassword)}
+            >
+              {showPassword ? 'Hide' : 'Show'}
             </button>
           </div>
           {password && (
             <div className="password-strength-container">
-              <div className="strength-bar" style={{ width: strength.width, backgroundColor: strength.color }}></div>
-              <span style={{ color: strength.color, fontSize: '12px' }}>{strength.text}</span>
+              <div
+                className="strength-bar"
+                style={{ width: strength.width, backgroundColor: strength.color }}
+              ></div>
+              <span style={{ color: strength.color, fontSize: '12px' }}>
+                {strength.text}
+              </span>
             </div>
           )}
           <div className="input-group">
-            <input type="password" placeholder="Confirm Password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required />
+            <input
+              type="password"
+              placeholder="Confirm Password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              required
+            />
           </div>
-          
+
           <button type="submit" className="auth-btn" disabled={loading}>
-            {loading ? <div className="spinner"></div> : "Create Account"}
+            {loading ? <div className="spinner"></div> : 'Create Account'}
           </button>
           {error && <div className="auth-error">{error}</div>}
         </form>
