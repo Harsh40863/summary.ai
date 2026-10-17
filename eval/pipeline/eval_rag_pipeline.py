@@ -44,13 +44,19 @@ from typing import Optional
 
 from dotenv import load_dotenv
 
-# Ensure project root is in sys.path
-_PROJECT_ROOT = Path(__file__).resolve().parent.parent if "eval" in str(Path(__file__).resolve()) else Path(__file__).resolve().parent
-if str(_PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(_PROJECT_ROOT))
+# Ensure project root & eval dir are in sys.path
+_PIPELINE_DIR = Path(__file__).resolve().parent
+_EVAL_DIR = _PIPELINE_DIR.parent
+_PROJECT_ROOT = _EVAL_DIR.parent
+_BACKEND_DIR = _PROJECT_ROOT / "backend"
+_SRC_DIR = _PROJECT_ROOT / "src"
+
+for _p in (_PROJECT_ROOT, _BACKEND_DIR, _SRC_DIR, _EVAL_DIR):
+    if str(_p) not in sys.path:
+        sys.path.insert(0, str(_p))
 
 load_dotenv(_PROJECT_ROOT / ".env")
-load_dotenv(_PROJECT_ROOT / "backend" / ".env")
+load_dotenv(_BACKEND_DIR / ".env")
 
 os.environ["DEEPEVAL_DISABLE_TIMEOUTS"] = "Y"
 

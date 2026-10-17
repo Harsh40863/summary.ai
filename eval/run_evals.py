@@ -53,11 +53,13 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 # Ensure project root & backend are in sys.path
-_PROJECT_ROOT = Path(__file__).resolve().parent
+_EVAL_DIR = Path(__file__).resolve().parent
+_PROJECT_ROOT = _EVAL_DIR.parent
 _BACKEND_DIR = _PROJECT_ROOT / "backend"
-_EVAL_DIR = _PROJECT_ROOT / "eval"
+_SRC_DIR = _PROJECT_ROOT / "src"
+_SUMMARY_AI_DIR = _PROJECT_ROOT / "summary.ai"
 
-for _p in (_PROJECT_ROOT, _BACKEND_DIR, _EVAL_DIR):
+for _p in (_PROJECT_ROOT, _BACKEND_DIR, _SRC_DIR, _SUMMARY_AI_DIR, _EVAL_DIR):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 
@@ -148,7 +150,7 @@ def run_triad_suite(
     print("  Judge: Groq (qwen/qwen3.8-27b) | Generator: 100% Grounded Prompt")
     print("═" * 84)
 
-    from eval.eval_rag_pipeline import (
+    from eval.pipeline.eval_rag_pipeline import (
         _resolve_judge,
         load_goldens,
     )
@@ -261,7 +263,7 @@ def run_langsmith_suite(
     print("  Evaluators: Trace Linkage | Anti-Hallucination | Toxicity | PII Protection")
     print("═" * 84)
 
-    from eval.eval_langsmith import run_evaluation
+    from eval.safety.eval_langsmith import run_evaluation
 
     ds_type = "guardrails" if quick else "all"
     res = run_evaluation(

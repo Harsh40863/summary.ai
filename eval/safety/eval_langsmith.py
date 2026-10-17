@@ -26,14 +26,20 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-_PROJECT_ROOT = Path(__file__).resolve().parent.parent if "eval" in str(Path(__file__).resolve()) else Path(__file__).resolve().parent
-if str(_PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(_PROJECT_ROOT))
+_SAFETY_DIR = Path(__file__).resolve().parent
+_EVAL_DIR = _SAFETY_DIR.parent
+_PROJECT_ROOT = _EVAL_DIR.parent
+_BACKEND_DIR = _PROJECT_ROOT / "backend"
+_SRC_DIR = _PROJECT_ROOT / "src"
+
+for _p in (_PROJECT_ROOT, _BACKEND_DIR, _SRC_DIR, _EVAL_DIR):
+    if str(_p) not in sys.path:
+        sys.path.insert(0, str(_p))
 
 from dotenv import load_dotenv
 
 load_dotenv(_PROJECT_ROOT / ".env")
-load_dotenv(_PROJECT_ROOT / "backend" / ".env")
+load_dotenv(_BACKEND_DIR / ".env")
 
 import nltk
 _local_nltk = _PROJECT_ROOT / ".nltk_data"
@@ -41,7 +47,7 @@ if _local_nltk.is_dir() and str(_local_nltk) not in nltk.data.path:
     nltk.data.path.insert(0, str(_local_nltk))
 
 from eval.harness import load_goldens
-from eval.langsmith_evaluators import (
+from eval.safety.langsmith_evaluators import (
     ALL_LANGSMITH_EVALUATORS,
     hallucination_evaluator,
     pii_evaluator,
