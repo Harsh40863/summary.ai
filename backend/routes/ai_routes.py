@@ -6,8 +6,7 @@ _routes_dir = os.path.dirname(os.path.abspath(__file__))   # backend/routes/
 _backend_dir = os.path.dirname(_routes_dir)                  # backend/
 _project_root = os.path.dirname(_backend_dir)                # project root
 _summary_ai_dir = os.path.join(_project_root, "summary.ai") # summary.ai/
-_summary_backend_dir = os.path.join(_summary_ai_dir, "backend")
-for _p in [_summary_backend_dir, _backend_dir, _summary_ai_dir]:
+for _p in [_backend_dir, _summary_ai_dir, _project_root]:
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
@@ -16,8 +15,17 @@ from typing import List
 from auth import get_current_user
 from datetime import datetime
 
-# Import summary.ai models and logic
-from api import QueryRequest, QueryResponse, UploadResponse, SupportedLanguagesResponse, HealthResponse, DocumentsResponse
+# Import backend models and logic
+from models import (
+    QueryRequest,
+    QueryResponse,
+    UploadResponse,
+    SupportedLanguagesResponse,
+    HealthResponse,
+    DocumentsResponse,
+    DocumentInfo,
+    TranslationInfo,
+)
 from logic import get_search_engine, DocumentSearchEngine
 from translation.redis_translator import get_supported_languages
 from uploadmdb.db_ingest import delete_document_from_db
@@ -96,7 +104,6 @@ def process_query(
             result = translate_response(result, request.translate_to)
             
         if not result['success']:
-            from api import TranslationInfo
             return QueryResponse(
                 success=False,
                 message=result['message'],
@@ -107,7 +114,6 @@ def process_query(
                 translation=TranslationInfo(**result['translation']) if 'translation' in result else None
             )
             
-        from api import TranslationInfo
         return QueryResponse(
             success=True,
             message=result['message'],
@@ -123,7 +129,6 @@ def process_query(
 @router.get("/documents", response_model=DocumentsResponse)
 def get_documents_info(engine: DocumentSearchEngine = Depends(get_engine_for_user)):
     try:
-        from api import DocumentInfo
         doc_info = engine.get_documents_info()
         return DocumentsResponse(
             total_documents=doc_info['total_documents'],

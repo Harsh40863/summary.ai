@@ -1,0 +1,26 @@
+{
+  "timestamp": "2026-10-08T10:38:10.699598+00:00",
+  "total_cases": 1,
+  "average_precision": 1.0,
+  "average_recall": 1.0,
+  "average_f1": 1.0,
+  "pass_rate": 100.0,
+  "threshold": 0.7,
+  "cases": [
+    {
+      "id": "TC002",
+      "category": "technical_detail",
+      "query": "What computational complexity improvement does the model achieve?",
+      "generated_answer": "According to 'research_paper.pdf': This paper presents a novel deep learning architecture for natural language processing tasks. We introduce a transformer-based model that achieves state-of-the-art results on multiple NLP benchmarks. Our key contribution is a hybrid attention mechanism that reduces computational complexity from O(n^2) to O(n log n) while maintaining model accuracy. Experiments on GLUE, SuperGLUE, and SQuAD benchmarks demonstrate consistent improvements over baseline models.",
+      "ideal_answer": "Our key contribution is a hybrid attention mechanism that reduces computational complexity from O(n^2) to O(n log n) while maintaining model accuracy.",
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "passed": true,
+      "precision_reason": "The generated answer accurately reflects the information provided in the context and ground truth, with no hallucinations or unsupported claims.",
+      "recall_reason": "The generated answer includes all essential facts from the ground truth, specifically the reduction of computational complexity from O(n^2) to O(n log n) via a hybrid attention mechanism.",
+      "latency_s": 3.198,
+      "judge": "groq (qwen/qwen3.8-27b)"
+    }
+  ]
+}

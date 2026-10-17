@@ -1,0 +1,33 @@
+{
+  "component": "rag_pipeline_triad",
+  "hyperparameters": {
+    "evaluation_type": "rag_triad_pipeline",
+    "judge_model": "qwen/qwen3.8-27b",
+    "golden_dataset": "/Users/harshvaishnav/Desktop/summary.ai/eval/datasets/retriever_golden_dataset.json",
+    "threshold": 0.7,
+    "n_cases": 2
+  },
+  "summary": {
+    "metrics": {
+      "Contextual Relevancy": {
+        "average_score": 0.5833,
+        "pass_rate": 0.0,
+        "threshold": 0.7,
+        "n_cases": 2
+      },
+      "Faithfulness": {
+        "average_score": 1.0,
+        "pass_rate": 1.0,
+        "threshold": 0.7,
+        "n_cases": 2
+      },
+      "Answer Relevancy": {
+        "average_score": 0.75,
+        "pass_rate": 0.5,
+        "threshold": 0.7,
+        "n_cases": 2
+      }
+    },
+    "test_run_id": null
+  }
+}

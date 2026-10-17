@@ -1,0 +1,26 @@
+{
+  "timestamp": "2026-10-08T10:39:58.221140+00:00",
+  "total_cases": 1,
+  "average_precision": 1.0,
+  "average_recall": 1.0,
+  "average_f1": 1.0,
+  "pass_rate": 100.0,
+  "threshold": 0.7,
+  "cases": [
+    {
+      "id": "TC002",
+      "category": "technical_detail",
+      "query": "What computational complexity improvement does the model achieve?",
+      "retrieved_count": 1,
+      "expected_count": 1,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "passed": true,
+      "precision_reason": "The single retrieved chunk contains the specific information regarding the computational complexity improvement, making it fully relevant to the query.",
+      "recall_reason": "The retrieved chunk explicitly states that the hybrid attention mechanism reduces computational complexity from O(n^2) to O(n log n), covering the key fact from the ground truth.",
+      "latency_s": 2.857,
+      "judge": "grok (qwen/qwen3.8-27b)"
+    }
+  ]
+}

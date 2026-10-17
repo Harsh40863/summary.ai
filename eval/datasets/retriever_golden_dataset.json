@@ -1,0 +1,308 @@
+{
+  "dataset_version": "1.0",
+  "description": "Golden dataset for evaluating the summary.ai retriever pipeline. Each test case contains a query, the list of expected relevant document chunk IDs, and metadata about the expected retrieval behaviour.",
+  "notes": [
+    "chunk_id is constructed as '{doc_name}::{sentence_index}' to identify which chunk should be retrieved.",
+    "expected_chunks lists ALL chunks that would be considered correct for that query.",
+    "min_relevant_in_top_k defines how many of the expected chunks should appear in top-k for the test to pass.",
+    "threshold is the minimum cosine similarity score the engine should return."
+  ],
+  "test_cases": [
+    {
+      "id": "TC001",
+      "category": "factual_lookup",
+      "query": "What is the main topic of the uploaded research paper?",
+      "input_documents": [
+        {
+          "doc_name": "research_paper.pdf",
+          "content": "This paper presents a novel deep learning architecture for natural language processing tasks. We introduce a transformer-based model that achieves state-of-the-art results on multiple NLP benchmarks. Our key contribution is a hybrid attention mechanism that reduces computational complexity from O(n^2) to O(n log n) while maintaining model accuracy. Experiments on GLUE, SuperGLUE, and SQuAD benchmarks demonstrate consistent improvements over baseline models."
+        }
+      ],
+      "expected_chunks": [
+        {
+          "chunk_id": "research_paper.pdf::0",
+          "text": "This paper presents a novel deep learning architecture for natural language processing tasks.",
+          "relevance": "high"
+        },
+        {
+          "chunk_id": "research_paper.pdf::1",
+          "text": "We introduce a transformer-based model that achieves state-of-the-art results on multiple NLP benchmarks.",
+          "relevance": "high"
+        }
+      ],
+      "min_relevant_in_top_k": 1,
+      "top_k": 3,
+      "expected_threshold": 0.3
+    },
+    {
+      "id": "TC002",
+      "category": "technical_detail",
+      "query": "What computational complexity improvement does the model achieve?",
+      "input_documents": [
+        {
+          "doc_name": "research_paper.pdf",
+          "content": "This paper presents a novel deep learning architecture for natural language processing tasks. We introduce a transformer-based model that achieves state-of-the-art results on multiple NLP benchmarks. Our key contribution is a hybrid attention mechanism that reduces computational complexity from O(n^2) to O(n log n) while maintaining model accuracy. Experiments on GLUE, SuperGLUE, and SQuAD benchmarks demonstrate consistent improvements over baseline models."
+        }
+      ],
+      "expected_chunks": [
+        {
+          "chunk_id": "research_paper.pdf::2",
+          "text": "Our key contribution is a hybrid attention mechanism that reduces computational complexity from O(n^2) to O(n log n) while maintaining model accuracy.",
+          "relevance": "high"
+        }
+      ],
+      "min_relevant_in_top_k": 1,
+      "top_k": 3,
+      "expected_threshold": 0.3
+    },
+    {
+      "id": "TC003",
+      "category": "financial_report",
+      "query": "What were the total quarterly revenues and profit margins?",
+      "input_documents": [
+        {
+          "doc_name": "q3_financial_report.pdf",
+          "content": "Q3 Financial Report Summary. Total revenues for the third quarter reached $4.2 billion, representing a 12% year-over-year increase. Operating profit margin improved to 23.5% from 19.8% in the same period last year. Net income attributable to shareholders was $840 million. The increase was primarily driven by strong performance in the cloud services division, which grew 34% year-over-year. Capital expenditures totaled $620 million for the quarter."
+        }
+      ],
+      "expected_chunks": [
+        {
+          "chunk_id": "q3_financial_report.pdf::1",
+          "text": "Total revenues for the third quarter reached $4.2 billion, representing a 12% year-over-year increase.",
+          "relevance": "high"
+        },
+        {
+          "chunk_id": "q3_financial_report.pdf::2",
+          "text": "Operating profit margin improved to 23.5% from 19.8% in the same period last year.",
+          "relevance": "high"
+        }
+      ],
+      "min_relevant_in_top_k": 1,
+      "top_k": 3,
+      "expected_threshold": 0.3
+    },
+    {
+      "id": "TC004",
+      "category": "financial_report",
+      "query": "Which division drove the revenue growth?",
+      "input_documents": [
+        {
+          "doc_name": "q3_financial_report.pdf",
+          "content": "Q3 Financial Report Summary. Total revenues for the third quarter reached $4.2 billion, representing a 12% year-over-year increase. Operating profit margin improved to 23.5% from 19.8% in the same period last year. Net income attributable to shareholders was $840 million. The increase was primarily driven by strong performance in the cloud services division, which grew 34% year-over-year. Capital expenditures totaled $620 million for the quarter."
+        }
+      ],
+      "expected_chunks": [
+        {
+          "chunk_id": "q3_financial_report.pdf::4",
+          "text": "The increase was primarily driven by strong performance in the cloud services division, which grew 34% year-over-year.",
+          "relevance": "high"
+        }
+      ],
+      "min_relevant_in_top_k": 1,
+      "top_k": 3,
+      "expected_threshold": 0.3
+    },
+    {
+      "id": "TC005",
+      "category": "policy_document",
+      "query": "What is the employee leave policy for sick days?",
+      "input_documents": [
+        {
+          "doc_name": "hr_policy_2024.pdf",
+          "content": "Employee Benefits and Leave Policy. All full-time employees are entitled to 20 days of paid annual leave per year. Sick leave is provided at 10 days per year and may be carried over for up to 5 days into the next year. Maternity leave is 26 weeks fully paid. Paternity leave is 2 weeks fully paid. Employees must notify their manager within 2 hours of the start of their shift if taking sick leave. Medical certificates are required for sick leave exceeding 3 consecutive days."
+        }
+      ],
+      "expected_chunks": [
+        {
+          "chunk_id": "hr_policy_2024.pdf::1",
+          "text": "Sick leave is provided at 10 days per year and may be carried over for up to 5 days into the next year.",
+          "relevance": "high"
+        },
+        {
+          "chunk_id": "hr_policy_2024.pdf::4",
+          "text": "Employees must notify their manager within 2 hours of the start of their shift if taking sick leave.",
+          "relevance": "medium"
+        },
+        {
+          "chunk_id": "hr_policy_2024.pdf::5",
+          "text": "Medical certificates are required for sick leave exceeding 3 consecutive days.",
+          "relevance": "medium"
+        }
+      ],
+      "min_relevant_in_top_k": 1,
+      "top_k": 3,
+      "expected_threshold": 0.25
+    },
+    {
+      "id": "TC006",
+      "category": "policy_document",
+      "query": "How long is maternity leave?",
+      "input_documents": [
+        {
+          "doc_name": "hr_policy_2024.pdf",
+          "content": "Employee Benefits and Leave Policy. All full-time employees are entitled to 20 days of paid annual leave per year. Sick leave is provided at 10 days per year and may be carried over for up to 5 days into the next year. Maternity leave is 26 weeks fully paid. Paternity leave is 2 weeks fully paid. Employees must notify their manager within 2 hours of the start of their shift if taking sick leave. Medical certificates are required for sick leave exceeding 3 consecutive days."
+        }
+      ],
+      "expected_chunks": [
+        {
+          "chunk_id": "hr_policy_2024.pdf::2",
+          "text": "Maternity leave is 26 weeks fully paid.",
+          "relevance": "high"
+        }
+      ],
+      "min_relevant_in_top_k": 1,
+      "top_k": 3,
+      "expected_threshold": 0.3
+    },
+    {
+      "id": "TC007",
+      "category": "legal_contract",
+      "query": "What are the termination clauses in the contract?",
+      "input_documents": [
+        {
+          "doc_name": "service_agreement.pdf",
+          "content": "Service Agreement Terms and Conditions. This agreement shall remain in effect for a period of 24 months from the date of signing. Either party may terminate this agreement with 30 days written notice. Immediate termination is permitted in cases of material breach, insolvency, or violation of confidentiality obligations. Upon termination, all confidential information must be returned or destroyed within 14 days. Termination fees of 15% of remaining contract value apply if the client terminates without cause before contract expiry."
+        }
+      ],
+      "expected_chunks": [
+        {
+          "chunk_id": "service_agreement.pdf::1",
+          "text": "Either party may terminate this agreement with 30 days written notice.",
+          "relevance": "high"
+        },
+        {
+          "chunk_id": "service_agreement.pdf::2",
+          "text": "Immediate termination is permitted in cases of material breach, insolvency, or violation of confidentiality obligations.",
+          "relevance": "high"
+        },
+        {
+          "chunk_id": "service_agreement.pdf::4",
+          "text": "Termination fees of 15% of remaining contract value apply if the client terminates without cause before contract expiry.",
+          "relevance": "medium"
+        }
+      ],
+      "min_relevant_in_top_k": 2,
+      "top_k": 5,
+      "expected_threshold": 0.25
+    },
+    {
+      "id": "TC008",
+      "category": "legal_contract",
+      "query": "What happens to confidential data after the contract ends?",
+      "input_documents": [
+        {
+          "doc_name": "service_agreement.pdf",
+          "content": "Service Agreement Terms and Conditions. This agreement shall remain in effect for a period of 24 months from the date of signing. Either party may terminate this agreement with 30 days written notice. Immediate termination is permitted in cases of material breach, insolvency, or violation of confidentiality obligations. Upon termination, all confidential information must be returned or destroyed within 14 days. Termination fees of 15% of remaining contract value apply if the client terminates without cause before contract expiry."
+        }
+      ],
+      "expected_chunks": [
+        {
+          "chunk_id": "service_agreement.pdf::3",
+          "text": "Upon termination, all confidential information must be returned or destroyed within 14 days.",
+          "relevance": "high"
+        }
+      ],
+      "min_relevant_in_top_k": 1,
+      "top_k": 3,
+      "expected_threshold": 0.3
+    },
+    {
+      "id": "TC009",
+      "category": "technical_spec",
+      "query": "What are the system requirements for the software installation?",
+      "input_documents": [
+        {
+          "doc_name": "software_manual.pdf",
+          "content": "Installation and System Requirements. The software requires a minimum of 8 GB RAM and 20 GB free disk space for installation. A 64-bit operating system is required; supported systems include Windows 10/11, Ubuntu 20.04+, and macOS 12+. An internet connection is required during installation for license activation. CPU must be Intel Core i5 or AMD Ryzen 5 equivalent or higher. GPU acceleration is optional but recommended for processing large datasets, requiring NVIDIA GPU with CUDA 11.0+ support."
+        }
+      ],
+      "expected_chunks": [
+        {
+          "chunk_id": "software_manual.pdf::0",
+          "text": "The software requires a minimum of 8 GB RAM and 20 GB free disk space for installation.",
+          "relevance": "high"
+        },
+        {
+          "chunk_id": "software_manual.pdf::1",
+          "text": "A 64-bit operating system is required; supported systems include Windows 10/11, Ubuntu 20.04+, and macOS 12+.",
+          "relevance": "high"
+        },
+        {
+          "chunk_id": "software_manual.pdf::3",
+          "text": "CPU must be Intel Core i5 or AMD Ryzen 5 equivalent or higher.",
+          "relevance": "medium"
+        }
+      ],
+      "min_relevant_in_top_k": 1,
+      "top_k": 3,
+      "expected_threshold": 0.3
+    },
+    {
+      "id": "TC010",
+      "category": "technical_spec",
+      "query": "Is GPU required and what CUDA version is needed?",
+      "input_documents": [
+        {
+          "doc_name": "software_manual.pdf",
+          "content": "Installation and System Requirements. The software requires a minimum of 8 GB RAM and 20 GB free disk space for installation. A 64-bit operating system is required; supported systems include Windows 10/11, Ubuntu 20.04+, and macOS 12+. An internet connection is required during installation for license activation. CPU must be Intel Core i5 or AMD Ryzen 5 equivalent or higher. GPU acceleration is optional but recommended for processing large datasets, requiring NVIDIA GPU with CUDA 11.0+ support."
+        }
+      ],
+      "expected_chunks": [
+        {
+          "chunk_id": "software_manual.pdf::4",
+          "text": "GPU acceleration is optional but recommended for processing large datasets, requiring NVIDIA GPU with CUDA 11.0+ support.",
+          "relevance": "high"
+        }
+      ],
+      "min_relevant_in_top_k": 1,
+      "top_k": 3,
+      "expected_threshold": 0.3
+    },
+    {
+      "id": "TC011",
+      "category": "multi_doc_retrieval",
+      "query": "What are the revenue figures and what software system is used to manage them?",
+      "input_documents": [
+        {
+          "doc_name": "q3_financial_report.pdf",
+          "content": "Q3 Financial Report Summary. Total revenues for the third quarter reached $4.2 billion, representing a 12% year-over-year increase. Operating profit margin improved to 23.5% from 19.8% in the same period last year."
+        },
+        {
+          "doc_name": "software_manual.pdf",
+          "content": "Installation and System Requirements. The software requires a minimum of 8 GB RAM and 20 GB free disk space for installation. The financial reporting module integrates with SAP and Oracle ERP systems for revenue tracking and reporting."
+        }
+      ],
+      "expected_chunks": [
+        {
+          "chunk_id": "q3_financial_report.pdf::1",
+          "text": "Total revenues for the third quarter reached $4.2 billion, representing a 12% year-over-year increase.",
+          "relevance": "high"
+        },
+        {
+          "chunk_id": "software_manual.pdf::1",
+          "text": "The financial reporting module integrates with SAP and Oracle ERP systems for revenue tracking and reporting.",
+          "relevance": "medium"
+        }
+      ],
+      "min_relevant_in_top_k": 1,
+      "top_k": 5,
+      "expected_threshold": 0.25
+    },
+    {
+      "id": "TC012",
+      "category": "negative_test",
+      "query": "What is the recipe for chocolate cake?",
+      "input_documents": [
+        {
+          "doc_name": "research_paper.pdf",
+          "content": "This paper presents a novel deep learning architecture for natural language processing tasks. We introduce a transformer-based model that achieves state-of-the-art results on multiple NLP benchmarks."
+        }
+      ],
+      "expected_chunks": [],
+      "min_relevant_in_top_k": 0,
+      "top_k": 3,
+      "expected_threshold": 0.3,
+      "notes": "No relevant chunks should be retrieved. Tests retriever does not hallucinate relevance for out-of-domain queries."
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "timestamp": "2026-10-08T10:41:10.294373+00:00",
+  "total_cases": 2,
+  "average_precision": 1.0,
+  "average_recall": 1.0,
+  "average_f1": 1.0,
+  "pass_rate": 100.0,
+  "threshold": 0.7,
+  "cases": [
+    {
+      "id": "TC003",
+      "category": "financial_report",
+      "query": "What were the total quarterly revenues and profit margins?",
+      "generated_answer": "According to 'q3_financial_report.pdf': Q3 Financial Report Summary. Total revenues for the third quarter reached $4.2 billion, representing a 12% year-over-year increase. Operating profit margin improved to 23.5% from 19.8% in the same period last year. Net income attributable to shareholders was $840 million. The increase was primarily driven by strong performance in the cloud services division, which grew 34% year-over-year. Capital expenditures totaled $620 million for the quarter.",
+      "ideal_answer": "Total revenues for the third quarter reached $4.2 billion, representing a 12% year-over-year increase. Operating profit margin improved to 23.5% from 19.8% in the same period last year.",
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "passed": true,
+      "precision_reason": "All statements in the generated answer are directly supported by the provided context and contain no hallucinations or contradictions.",
+      "recall_reason": "The generated answer includes all essential facts from the ground truth, specifically the total revenue of $4.2 billion, the 12% YoY increase, and the operating profit margin improvement to 23.5% from 19.8%.",
+      "latency_s": 3.25,
+      "judge": "groq (qwen/qwen3.8-27b)"
+    },
+    {
+      "id": "TC004",
+      "category": "financial_report",
+      "query": "Which division drove the revenue growth?",
+      "generated_answer": "According to 'q3_financial_report.pdf': Q3 Financial Report Summary. Total revenues for the third quarter reached $4.2 billion, representing a 12% year-over-year increase. Operating profit margin improved to 23.5% from 19.8% in the same period last year. Net income attributable to shareholders was $840 million. The increase was primarily driven by strong performance in the cloud services division, which grew 34% year-over-year. Capital expenditures totaled $620 million for the quarter.",
+      "ideal_answer": "The increase was primarily driven by strong performance in the cloud services division, which grew 34% year-over-year.",
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "passed": true,
+      "precision_reason": "All statements in the generated answer are directly supported by the provided context and contain no hallucinations or contradictions.",
+      "recall_reason": "The generated answer includes the exact ground truth statement regarding the cloud services division driving the growth.",
+      "latency_s": 1.219,
+      "judge": "groq (qwen/qwen3.8-27b)"
+    }
+  ]
+}

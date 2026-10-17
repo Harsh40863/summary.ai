@@ -1,0 +1,41 @@
+{
+  "timestamp": "2026-10-08T10:27:10.313314+00:00",
+  "total_cases": 2,
+  "average_precision": 1.0,
+  "average_recall": 1.0,
+  "average_f1": 1.0,
+  "pass_rate": 100.0,
+  "threshold": 0.7,
+  "cases": [
+    {
+      "id": "TC007",
+      "category": "legal_contract",
+      "query": "What are the termination clauses in the contract?",
+      "retrieved_count": 1,
+      "expected_count": 3,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "passed": true,
+      "precision_reason": "1/1 retrieved chunks matched ground truth",
+      "recall_reason": "3/3 expected chunks captured in context",
+      "latency_s": 2.033,
+      "judge": "ground-truth-match (fallback)"
+    },
+    {
+      "id": "TC008",
+      "category": "legal_contract",
+      "query": "What happens to confidential data after the contract ends?",
+      "retrieved_count": 1,
+      "expected_count": 1,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "passed": true,
+      "precision_reason": "1/1 retrieved chunks matched ground truth",
+      "recall_reason": "1/1 expected chunks captured in context",
+      "latency_s": 0.017,
+      "judge": "ground-truth-match (fallback)"
+    }
+  ]
+}

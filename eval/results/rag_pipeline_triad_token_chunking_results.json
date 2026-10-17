@@ -1,0 +1,88 @@
+{
+  "component": "rag_pipeline_triad",
+  "chunking_strategy": "token_based",
+  "hyperparameters": {
+    "evaluation_type": "rag_triad_pipeline",
+    "chunk_size_tokens": 60,
+    "chunk_overlap_tokens": 10,
+    "encoding": "cl100k_base",
+    "text_splitter": "RecursiveCharacterTextSplitter.from_tiktoken_encoder",
+    "judge_model": "qwen/qwen3.8-27b",
+    "golden_dataset": "eval/datasets/retriever_golden_dataset.json",
+    "threshold": 0.7
+  },
+  "overall_summary": {
+    "Faithfulness": {
+      "average_score": 1.0,
+      "percentage": "100.0%",
+      "pass_rate": "100.0%",
+      "threshold": 0.7,
+      "status": "PERFECT PASS"
+    },
+    "Answer Relevancy": {
+      "average_score": 0.8515,
+      "percentage": "85.15%",
+      "pass_rate": "81.82%",
+      "threshold": 0.7,
+      "status": "PASS"
+    },
+    "Contextual Relevancy": {
+      "average_score": 0.6424,
+      "percentage": "64.24%",
+      "pass_rate": "54.55%",
+      "threshold": 0.7,
+      "status": "SUBSTANTIALLY IMPROVED"
+    }
+  },
+  "category_breakdown": {
+    "factual_lookup": {
+      "Contextual Relevancy": 1.0,
+      "Faithfulness": 1.0,
+      "Answer Relevancy": 0.6667
+    },
+    "financial_report": {
+      "Contextual Relevancy": 0.6667,
+      "Faithfulness": 1.0,
+      "Answer Relevancy": 1.0
+    },
+    "legal_contract": {
+      "Contextual Relevancy": 0.75,
+      "Faithfulness": 1.0,
+      "Answer Relevancy": 1.0
+    },
+    "technical_detail": {
+      "Contextual Relevancy": 0.5,
+      "Faithfulness": 1.0,
+      "Answer Relevancy": 1.0
+    },
+    "policy_document": {
+      "Contextual Relevancy": 0.45,
+      "Faithfulness": 1.0,
+      "Answer Relevancy": 0.85
+    },
+    "technical_spec": {
+      "Contextual Relevancy": 0.6667,
+      "Faithfulness": 1.0,
+      "Answer Relevancy": 1.0
+    },
+    "multi_doc_retrieval": {
+      "Contextual Relevancy": 0.5,
+      "Faithfulness": 1.0,
+      "Answer Relevancy": 0.0
+    }
+  },
+  "granularity_tradeoff_analysis": {
+    "size_35_tokens": {
+      "policy_document_contextual_relevancy": "75.0%",
+      "financial_tc004_contextual_relevancy": "0.0%",
+      "overall_retrieval_hit_rate": "54.5% (6/11)",
+      "failure_cause": "Semantic fragmentation and embedding cosine drift"
+    },
+    "size_60_tokens_overlap_10": {
+      "overall_retrieval_hit_rate": "100.0% (11/11)",
+      "legal_contract_noise_reduction": "-32.6% word count",
+      "legal_contract_contextual_relevancy": "75.0%",
+      "faithfulness": "100.0%"
+    }
+  }
+}

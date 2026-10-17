@@ -57,17 +57,29 @@ class ForceCORSMiddleware(BaseHTTPMiddleware):
         response.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type, Accept, Cookie"
         return response
 
-# Add force-CORS middleware FIRST (outermost layer)
-app.add_middleware(ForceCORSMiddleware)
+origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+]
+if FRONTEND_URL and FRONTEND_URL not in origins:
+    origins.append(FRONTEND_URL)
 
-# Standard CORS middleware as backup
+# Standard CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex="http://localhost:.*",
+    allow_origins=origins,
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Outermost layer (added last in Starlette) to force CORS on preflights and crashes
+app.add_middleware(ForceCORSMiddleware)
 
 app.include_router(auth_routes.router, prefix="/auth", tags=["auth"])
 app.include_router(ai_routes.router, prefix="/api", tags=["api"])
